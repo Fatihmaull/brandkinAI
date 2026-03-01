@@ -1,0 +1,23 @@
+# BrandKin AI - Backend Dependencies
+# Alibaba Cloud Services
+dashscope>=1.14.0
+aliyun-python-sdk-core>=2.13.0
+aliyun-python-sdk-sts>=3.0.0
+oss2>=2.18.0
+# aliyun-python-sdk-mns is not available on PyPI, use alibabacloud_mns instead
+# or install from git: https://github.com/aliyun/aliyun-mns-python-sdk
+# For now, we'll use the SDK via aliyun-python-sdk-core
+pymysql>=1.1.0
+
+# Web Framework
+flask>=2.3.0
+werkzeug>=2.3.0
+
+# Utilities
+requests>=2.31.0
+python-json-logger>=2.0.0
+jsonschema>=4.19.0
+Pillow>=10.0.0
+
+# Environment
+python-dotenv>=1.0.0

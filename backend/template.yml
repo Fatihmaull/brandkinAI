@@ -1,0 +1,206 @@
+ROSTemplateFormatVersion: '2015-09-01'
+Description: BrandKin AI - Function Compute 3.0 Deployment Template
+
+Parameters:
+  ServiceName:
+    Type: String
+    Default: brandkin-ai-service
+    Description: FC Service Name
+  
+  DashScopeApiKey:
+    Type: String
+    NoEcho: true
+    Description: DashScope API Key
+  
+  OssBucket:
+    Type: String
+    Default: brandkin-ai-assets
+    Description: OSS Bucket Name
+  
+  RdsHost:
+    Type: String
+    Description: RDS MySQL Host
+  
+  RdsPassword:
+    Type: String
+    NoEcho: true
+    Description: RDS MySQL Password
+
+Resources:
+  # FC Service
+  BrandKinService:
+    Type: 'Aliyun::Serverless::Service'
+    Properties:
+      Description: BrandKin AI Service
+      Role: !GetAtt FCExecutionRole.Arn
+      LogConfig:
+        Project: brandkin-ai-logs
+        Logstore: function-logs
+      EnvironmentVariables:
+        DASHSCOPE_API_KEY: !Ref DashScopeApiKey
+        OSS_BUCKET: !Ref OssBucket
+        OSS_ENDPOINT: oss-cn-hangzhou.aliyuncs.com
+        OSS_REGION: cn-hangzhou
+        RDS_HOST: !Ref RdsHost
+        RDS_PORT: '3306'
+        RDS_DATABASE: brandkin_ai
+        RDS_USER: brandkin_admin
+        RDS_PASSWORD: !Ref RdsPassword
+        MNS_ENDPOINT: https://123456789.mns.cn-hangzhou.aliyuncs.com
+        MNS_QUEUE_NAME: brandkin-generation-tasks
+
+  # HTTP API Function
+  ApiHandlerFunction:
+    Type: 'Aliyun::Serverless::Function'
+    Properties:
+      ServiceName: !Ref BrandKinService
+      FunctionName: api-handler
+      Description: Main API Handler for BrandKin AI
+      Runtime: python3.10
+      Handler: orchestrator.api_handler.handler
+      CodeUri: ./fc-functions
+      MemorySize: 512
+      Timeout: 60
+      EnvironmentVariables:
+        PYTHONPATH: /code
+
+  # Stage 1 Handler Function
+  Stage1Function:
+    Type: 'Aliyun::Serverless::Function'
+    Properties:
+      ServiceName: !Ref BrandKinService
+      FunctionName: stage1-dna-handler
+      Description: Stage 1 - Brand DNA Analysis
+      Runtime: python3.10
+      Handler: stage_handlers.stage1_dna.handler
+      CodeUri: ./fc-functions
+      MemorySize: 512
+      Timeout: 120
+
+  # Stage 2 Handler Function
+  Stage2Function:
+    Type: 'Aliyun::Serverless::Function'
+    Properties:
+      ServiceName: !Ref BrandKinService
+      FunctionName: stage2-visual-handler
+      Description: Stage 2 - Visual Generation
+      Runtime: python3.10
+      Handler: stage_handlers.stage2_visual.handler
+      CodeUri: ./fc-functions
+      MemorySize: 1024
+      Timeout: 300
+
+  # Stage 4 Handler Function
+  Stage4Function:
+    Type: 'Aliyun::Serverless::Function'
+    Properties:
+      ServiceName: !Ref BrandKinService
+      FunctionName: stage4-poses-handler
+      Description: Stage 4 - Pose Pack Generation
+      Runtime: python3.10
+      Handler: stage_handlers.stage4_poses.handler
+      CodeUri: ./fc-functions
+      MemorySize: 1024
+      Timeout: 600
+
+  # Stage 5 Handler Function
+  Stage5Function:
+    Type: 'Aliyun::Serverless::Function'
+    Properties:
+      ServiceName: !Ref BrandKinService
+      FunctionName: stage5-code-handler
+      Description: Stage 5 - Code Export
+      Runtime: python3.10
+      Handler: stage_handlers.stage5_code.handler
+      CodeUri: ./fc-functions
+      MemorySize: 512
+      Timeout: 120
+
+  # Stage 7 Handler Function
+  Stage7Function:
+    Type: 'Aliyun::Serverless::Function'
+    Properties:
+      ServiceName: !Ref BrandKinService
+      FunctionName: stage7-assembly-handler
+      Description: Stage 7 - Brand Kit Assembly
+      Runtime: python3.10
+      Handler: stage_handlers.stage7_assembly.handler
+      CodeUri: ./fc-functions
+      MemorySize: 1024
+      Timeout: 300
+
+  # RAM Role for FC Execution
+  FCExecutionRole:
+    Type: 'Aliyun::RAM::Role'
+    Properties:
+      RoleName: BrandKinAIFCExecutionRole
+      Description: Execution role for BrandKin AI Function Compute
+      AssumeRolePolicyDocument:
+        Version: '1'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - fc.aliyuncs.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: BrandKinAIFCPolicy
+          PolicyDocument:
+            Version: '1'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'dashscope:GenerateText'
+                  - 'dashscope:GenerateImage'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'oss:PutObject'
+                  - 'oss:GetObject'
+                  - 'oss:DeleteObject'
+                  - 'oss:ListObjects'
+                Resource:
+                  - !Sub 'acs:oss:*:*:${OssBucket}'
+                  - !Sub 'acs:oss:*:*:${OssBucket}/*'
+              - Effect: Allow
+                Action:
+                  - 'rds:Connect'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'mns:SendMessage'
+                  - 'mns:ReceiveMessage'
+                  - 'mns:DeleteMessage'
+                Resource: '*'
+
+  # API Gateway
+  BrandKinApiGateway:
+    Type: 'Aliyun::ApiGateway::Api'
+    Properties:
+      GroupName: brandkin-ai-api
+      ApiName: brandkin-ai-api
+      Description: BrandKin AI REST API
+      AuthType: APP  # AppKey + AppSecret authentication
+      RequestConfig:
+        Protocol: HTTP
+        Method: ANY
+        Path: /
+        Mode: MAPPING
+      ServiceConfig:
+        ServiceProtocol: FunctionCompute
+        FunctionComputeConfig:
+          RegionId: cn-hangzhou
+          ServiceName: !Ref BrandKinService
+          FunctionName: api-handler
+        ContentTypeCatagory: DEFAULT
+      RequestParameters: []
+      StageName: RELEASE
+
+Outputs:
+  ServiceName:
+    Description: FC Service Name
+    Value: !Ref BrandKinService
+  
+  ApiEndpoint:
+    Description: API Gateway Endpoint
+    Value: !GetAtt BrandKinApiGateway.ApiEndpoint

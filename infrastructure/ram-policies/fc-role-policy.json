@@ -1,0 +1,50 @@
+{
+  "Version": "1",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "dashscope:GenerateText",
+        "dashscope:GenerateImage"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "oss:PutObject",
+        "oss:GetObject",
+        "oss:DeleteObject",
+        "oss:ListObjects"
+      ],
+      "Resource": [
+        "acs:oss:*:*:brandkin-ai-assets",
+        "acs:oss:*:*:brandkin-ai-assets/*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "rds:Connect"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "mns:SendMessage",
+        "mns:ReceiveMessage",
+        "mns:DeleteMessage",
+        "mns:ChangeMessageVisibility"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "sts:AssumeRole"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
