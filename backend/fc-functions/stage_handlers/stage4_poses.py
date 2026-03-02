@@ -9,7 +9,7 @@ import uuid
 from typing import Dict, Any, List
 
 from utils.database import db
-from utils.dashscope_client import dashscope_client, DEFAULT_SEED
+from utils.ai_client import ai_client, DEFAULT_SEED
 from utils.oss_handler import oss_handler
 from prompts.stage_prompts import prompts
 
@@ -87,7 +87,7 @@ Brand DNA: {json.dumps(brand_dna, indent=2)}
 
 Create 5 distinct poses maintaining character consistency."""
         
-        pose_data = dashscope_client.call_qwen_max(
+        pose_data = ai_client.call_qwen_max(
             system_prompt=prompt_config['system_prompt'],
             user_prompt=user_prompt,
             temperature=0.8,
@@ -120,23 +120,19 @@ Create 5 distinct poses maintaining character consistency."""
 Same character, consistent style, matching the reference image.
 Seed: {DEFAULT_SEED}"""
             
-            # Generate pose image
-            pose_url = dashscope_client.call_wanx_with_retry(
+            # Generate pose image with correct size
+            pose_url = ai_client.call_wanx_with_retry(
                 prompt=full_prompt,
                 seed=DEFAULT_SEED,  # CRITICAL: Consistency rule
-                size="1024*1024"
+                size="1024x1024"  # Use 'x' instead of '*' for this model
             )
             
-            # Upload to OSS
-            pose_oss_key = f"projects/{project_id}/pose_{i+1}_{pose_asset_id}.png"
-            pose_oss_url = oss_handler.upload_with_retry(pose_url, pose_oss_key)
+            # Use the generated image URL directly
+            pose_oss_url = pose_url
             
-            # Remove background
-            pose_transparent_url = dashscope_client.remove_background(pose_url)
-            pose_transparent_oss_key = f"projects/{project_id}/pose_{i+1}_{pose_asset_id}_transparent.png"
-            pose_transparent_oss_url = oss_handler.upload_with_retry(
-                pose_transparent_url, pose_transparent_oss_key
-            )
+            # Remove background (returns same URL for now)
+            pose_transparent_url = ai_client.remove_background(pose_url)
+            pose_transparent_oss_url = pose_transparent_url
             
             # Update asset
             db.update_asset_urls(

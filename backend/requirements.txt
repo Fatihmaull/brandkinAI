@@ -1,6 +1,5 @@
 # BrandKin AI - Backend Dependencies
-# Alibaba Cloud Services
-dashscope>=1.14.0
+# Alibaba Cloud Services (Model Studio uses OpenAI-compatible API, no dashscope needed)
 aliyun-python-sdk-core>=2.13.0
 aliyun-python-sdk-sts>=3.0.0
 oss2>=2.18.0

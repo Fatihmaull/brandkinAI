@@ -7,13 +7,28 @@ import json
 import uuid
 import zipfile
 import io
+import requests
 from datetime import datetime, timedelta
 from typing import Dict, Any, List
 
 from utils.database import db
-from utils.dashscope_client import dashscope_client, DEFAULT_SEED
+from utils.ai_client import ai_client, DEFAULT_SEED
 from utils.oss_handler import oss_handler
 from prompts.stage_prompts import prompts
+
+
+def download_image_from_url(url: str) -> bytes:
+    """Download image data from a URL."""
+    try:
+        response = requests.get(url, timeout=30)
+        if response.status_code == 200:
+            return response.content
+        else:
+            print(f"Failed to download image from {url}: {response.status_code}")
+            return b''
+    except Exception as e:
+        print(f"Error downloading image from {url}: {e}")
+        return b''
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -97,12 +112,23 @@ def process_assembly(project_id: str) -> Dict[str, Any]:
             project_id, assets, code_exports, brand_copy, banner_url
         )
         
-        # Step 5: Upload ZIP to OSS
+        # Step 5: Upload ZIP to OSS (or save locally in mock mode)
         zip_oss_key = f"projects/{project_id}/brandkit_{project_id}.zip"
         zip_oss_url = oss_handler.upload_data(zip_data, zip_oss_key)
         
         # Step 6: Generate signed URL (24h TTL)
-        signed_url = oss_handler.get_signed_url(zip_oss_key, expiration_hours=24)
+        # In mock mode, create a local file and return API download URL
+        if hasattr(oss_handler, 'use_mock') and oss_handler.use_mock:
+            import os
+            local_storage = os.path.join(os.path.dirname(__file__), '..', '..', 'local_storage')
+            os.makedirs(local_storage, exist_ok=True)
+            local_zip_path = os.path.join(local_storage, f"brandkit_{project_id}.zip")
+            with open(local_zip_path, 'wb') as f:
+                f.write(zip_data)
+            # Return API download URL
+            signed_url = f"http://localhost:5000/api/v1/download/{project_id}"
+        else:
+            signed_url = oss_handler.get_signed_url(zip_oss_key, expiration_hours=24)
         expires_at = datetime.utcnow() + timedelta(hours=24)
         
         # Step 7: Save brand kit record
@@ -119,6 +145,7 @@ def process_assembly(project_id: str) -> Dict[str, Any]:
         # Mark project as completed
         db.update_project_status(project_id, 'completed', stage=7)
         
+        import base64
         return {
             'success': True,
             'project_id': project_id,
@@ -133,7 +160,8 @@ def process_assembly(project_id: str) -> Dict[str, Any]:
                     'brand_copy': True,
                     'banner': True
                 }
-            }
+            },
+            'zip_data': base64.b64encode(zip_data).decode('utf-8')
         }
         
     except Exception as e:
@@ -160,7 +188,7 @@ def generate_brand_copy(brand_dna: Dict) -> Dict[str, Any]:
 
 Create compelling brand copy following the required JSON format."""
     
-    return dashscope_client.call_qwen_max(
+    return ai_client.call_qwen_max(
         system_prompt=prompt_config['system_prompt'],
         user_prompt=user_prompt,
         temperature=0.8,
@@ -183,10 +211,10 @@ def generate_linkedin_banner(project_id: str, brand_dna: Dict) -> str:
     banner_prompt = prompts.stage7_linkedin_banner_prompt(brand_dna)
     
     # Generate with wanx-v1
-    banner_url = dashscope_client.call_wanx_with_retry(
+    banner_url = ai_client.call_wanx_with_retry(
         prompt=banner_prompt,
         seed=DEFAULT_SEED,
-        size="1792*1024"  # LinkedIn banner aspect ratio
+        size="1024x1024"  # Use square format for wan2.2-t2i-flash compatibility
     )
     
     # Upload to OSS
@@ -222,25 +250,27 @@ def create_brand_kit_zip(
             asset_type = asset.get('asset_type', 'asset')
             asset_id = asset.get('asset_id', 'unknown')
             
-            # Download and add original image
+            # Download and add original image from URL
             if asset.get('oss_url'):
                 try:
-                    key = asset['oss_url'].split('/')[-1]
-                    image_data = oss_handler.download_to_memory(
-                        f"projects/{project_id}/{key}"
-                    )
-                    zip_file.writestr(f"assets/{asset_type}_{asset_id}.png", image_data)
+                    image_data = download_image_from_url(asset['oss_url'])
+                    if image_data:
+                        zip_file.writestr(f"assets/{asset_type}_{asset_id}.png", image_data)
+                        print(f"Added asset {asset_id} to ZIP")
+                    else:
+                        print(f"Skipping asset {asset_id}: no image data")
                 except Exception as e:
                     print(f"Failed to add asset {asset_id}: {e}")
             
-            # Download and add transparent image
+            # Download and add transparent image from URL
             if asset.get('transparent_url'):
                 try:
-                    key = asset['transparent_url'].split('/')[-1]
-                    image_data = oss_handler.download_to_memory(
-                        f"projects/{project_id}/{key}"
-                    )
-                    zip_file.writestr(f"assets/{asset_type}_{asset_id}_transparent.png", image_data)
+                    image_data = download_image_from_url(asset['transparent_url'])
+                    if image_data:
+                        zip_file.writestr(f"assets/{asset_type}_{asset_id}_transparent.png", image_data)
+                        print(f"Added transparent asset {asset_id} to ZIP")
+                    else:
+                        print(f"Skipping transparent asset {asset_id}: no image data")
                 except Exception as e:
                     print(f"Failed to add transparent asset {asset_id}: {e}")
         
@@ -275,11 +305,12 @@ def create_brand_kit_zip(
         # Add LinkedIn banner
         if banner_url:
             try:
-                banner_key = banner_url.split('/')[-1]
-                banner_data = oss_handler.download_to_memory(
-                    f"projects/{project_id}/{banner_key}"
-                )
-                zip_file.writestr("assets/linkedin_banner.png", banner_data)
+                banner_data = download_image_from_url(banner_url)
+                if banner_data:
+                    zip_file.writestr("assets/linkedin_banner.png", banner_data)
+                    print(f"Added banner to ZIP")
+                else:
+                    print(f"Skipping banner: no image data")
             except Exception as e:
                 print(f"Failed to add banner: {e}")
         

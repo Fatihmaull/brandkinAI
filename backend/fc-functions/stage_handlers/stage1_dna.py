@@ -8,7 +8,7 @@ import uuid
 from typing import Dict, Any
 
 from utils.database import db
-from utils.dashscope_client import dashscope_client
+from utils.ai_client import ai_client
 from prompts.stage_prompts import prompts
 
 
@@ -85,7 +85,7 @@ Brand Brief:
 Provide a comprehensive brand DNA analysis following the required JSON format."""
         
         # Call qwen-max
-        brand_dna = dashscope_client.call_qwen_max(
+        brand_dna = ai_client.call_qwen_max(
             system_prompt=prompt_config['system_prompt'],
             user_prompt=user_prompt,
             temperature=0.7,

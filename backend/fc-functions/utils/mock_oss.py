@@ -66,6 +66,11 @@ class MockOSSHandler:
         if oss_key.startswith('http'):
             return oss_key
         
+        # For brand kit zip files, create a data URL or return placeholder
+        if oss_key.endswith('.zip'):
+            # Return a placeholder message since we can't generate real ZIP in mock mode
+            return f"data:text/plain;charset=utf-8,This%20is%20a%20mock%20brand%20kit%20download.%20In%20production,%20this%20would%20be%20a%20real%20ZIP%20file%20containing%20all%20brand%20assets.%20Expires%20in%20{expiration_hours}h"
+        
         # Generate mock signed URL
         return f"https://mock-oss.local/{oss_key}?expires={expiration_hours}h"
     

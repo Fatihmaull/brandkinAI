@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Code, Copy, Check, Play } from 'lucide-react';
+import { Code, Copy, Check, FileCode, Palette, Terminal } from 'lucide-react';
 
 interface CodeExport {
   export_id: string;
@@ -43,12 +43,25 @@ export default function CodePreview({ exports }: CodePreviewProps) {
     }
   };
 
+  const getTabIcon = (tab: 'code' | 'css' | 'preview') => {
+    switch (tab) {
+      case 'code':
+        return <FileCode className="w-4 h-4" />;
+      case 'css':
+        return <Palette className="w-4 h-4" />;
+      case 'preview':
+        return <Terminal className="w-4 h-4" />;
+    }
+  };
+
   return (
-    <div className="glass rounded-xl p-6">
+    <div className="studio-card p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <Code className="w-6 h-6 text-brand-500" />
-          <h3 className="text-xl font-bold">Generated React Component</h3>
+          <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+            <Code className="w-4 h-4 text-blue-400" />
+          </div>
+          <h3 className="text-lg font-medium text-white">Generated React Component</h3>
         </div>
         
         {/* Component Selector */}
@@ -59,7 +72,7 @@ export default function CodePreview({ exports }: CodePreviewProps) {
               const exp = exports.find(ex => ex.export_id === e.target.value);
               if (exp) setSelectedExport(exp);
             }}
-            className="px-3 py-2 rounded-lg bg-white/5 border border-white/10"
+            className="studio-input py-2 text-sm"
           >
             {exports.map(exp => (
               <option key={exp.export_id} value={exp.export_id}>
@@ -71,57 +84,47 @@ export default function CodePreview({ exports }: CodePreviewProps) {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-4">
-        <button
-          onClick={() => setActiveTab('code')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            activeTab === 'code' ? 'bg-brand-500 text-white' : 'bg-white/10 hover:bg-white/20'
-          }`}
-        >
-          React Code
-        </button>
-        <button
-          onClick={() => setActiveTab('css')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            activeTab === 'css' ? 'bg-brand-500 text-white' : 'bg-white/10 hover:bg-white/20'
-          }`}
-        >
-          CSS Keyframes
-        </button>
-        <button
-          onClick={() => setActiveTab('preview')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            activeTab === 'preview' ? 'bg-brand-500 text-white' : 'bg-white/10 hover:bg-white/20'
-          }`}
-        >
-          Usage
-        </button>
+      <div className="flex gap-2 mb-4 p-1 bg-[#1c1c1e] rounded-lg">
+        {(['code', 'css', 'preview'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              activeTab === tab 
+                ? 'bg-[#3c3c43] text-white' 
+                : 'text-gray-400 hover:text-gray-200'
+            }`}
+          >
+            {getTabIcon(tab)}
+            {tab === 'code' ? 'React Code' : tab === 'css' ? 'CSS Keyframes' : 'Usage'}
+          </button>
+        ))}
       </div>
 
       {/* Code Display */}
       <div className="relative">
-        <pre className="bg-gray-900 rounded-lg p-4 overflow-x-auto text-sm font-mono text-gray-300 max-h-96 overflow-y-auto">
+        <pre className="bg-[#0d0d0d] rounded-lg p-4 overflow-x-auto text-sm font-mono text-gray-300 max-h-96 overflow-y-auto border border-[#3c3c43]">
           <code>{getActiveContent()}</code>
         </pre>
         
         {/* Copy Button */}
         <button
           onClick={() => handleCopy(getActiveContent())}
-          className="absolute top-2 right-2 p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+          className="absolute top-3 right-3 p-2 bg-[#1c1c1e] hover:bg-[#2c2c2e] rounded-lg transition-colors text-gray-400 hover:text-white"
           title="Copy to clipboard"
         >
-          {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
+          {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
         </button>
       </div>
 
       {/* Component Info */}
       {selectedExport && (
-        <div className="mt-4 p-4 bg-white/5 rounded-lg">
+        <div className="mt-4 p-4 bg-[#1c1c1e] rounded-lg border border-[#3c3c43]">
           <p className="text-sm text-gray-400">
-            <span className="font-semibold text-gray-300">Component:</span> {selectedExport.component_name}
+            <span className="font-medium text-gray-300">Component:</span> {selectedExport.component_name}
           </p>
-          <p className="text-sm text-gray-400 mt-1">
-            <span className="font-semibold text-gray-300">Export ID:</span> {selectedExport.export_id}
+          <p className="text-sm text-gray-500 mt-1">
+            <span className="font-medium text-gray-400">Export ID:</span> {selectedExport.export_id}
           </p>
         </div>
       )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { FlaskConical, Dna, Image, MousePointer, Users, Code, RefreshCw, Package } from 'lucide-react';
+import { Dna, Image, MousePointer, Users, Code, RefreshCw, Package, Check } from 'lucide-react';
 
 interface StageTrackerProps {
   currentStage: number;
@@ -8,7 +8,6 @@ interface StageTrackerProps {
 }
 
 const STAGES = [
-  { num: 0, name: 'Initialize', icon: FlaskConical },
   { num: 1, name: 'Brand DNA', icon: Dna },
   { num: 2, name: 'Visual Gen', icon: Image },
   { num: 3, name: 'Selection', icon: MousePointer },
@@ -27,48 +26,35 @@ export default function StageTracker({ currentStage, status }: StageTrackerProps
   };
 
   return (
-    <div className="glass rounded-xl p-6">
-      <h3 className="text-lg font-semibold mb-4 text-center">Alchemy Progress</h3>
-      
-      <div className="flex items-center justify-between">
-        {STAGES.map((stage, index) => {
-          const stageStatus = getStageStatus(stage.num);
-          const Icon = stage.icon;
-          
-          return (
-            <div key={stage.num} className="flex items-center">
-              {/* Stage Dot */}
-              <div className="flex flex-col items-center">
-                <div className={`stage-dot ${stageStatus} flex items-center justify-center w-10 h-10`}>
-                  <Icon className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-xs mt-2 text-gray-400 hidden sm:block">{stage.name}</span>
-              </div>
-              
-              {/* Connector Line */}
-              {index < STAGES.length - 1 && (
-                <div className={`w-8 sm:w-12 h-0.5 mx-1 ${
-                  stage.num < currentStage ? 'bg-green-500' : 'bg-gray-700'
-                }`} />
+    <div className="flex items-center gap-2">
+      {STAGES.map((stage, index) => {
+        const stageStatus = getStageStatus(stage.num);
+        const Icon = stage.icon;
+        const isActive = stage.num === currentStage;
+        
+        return (
+          <div key={stage.num} className="flex items-center">
+            {/* Stage Indicator */}
+            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs ${
+              stageStatus === 'completed' ? 'text-green-400' :
+              stageStatus === 'processing' ? 'text-blue-400 bg-blue-500/10' :
+              'text-gray-600'
+            }`}>
+              {stageStatus === 'completed' ? (
+                <Check className="w-3 h-3" />
+              ) : (
+                <Icon className="w-3 h-3" />
               )}
+              <span className="hidden sm:inline">{stage.name}</span>
             </div>
-          );
-        })}
-      </div>
-      
-      {/* Current Status */}
-      <div className="mt-4 text-center">
-        <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm ${
-          status === 'failed' ? 'bg-red-500/20 text-red-400' :
-          status === 'completed' ? 'bg-green-500/20 text-green-400' :
-          'bg-brand-500/20 text-brand-400'
-        }`}>
-          {status === 'processing' && <span className="w-2 h-2 bg-brand-500 rounded-full animate-pulse" />}
-          {status === 'failed' && <span className="w-2 h-2 bg-red-500 rounded-full" />}
-          {status === 'completed' && <span className="w-2 h-2 bg-green-500 rounded-full" />}
-          Stage {currentStage}: {STAGES[currentStage]?.name} - {status}
-        </span>
-      </div>
+            
+            {/* Connector */}
+            {index < STAGES.length - 1 && (
+              <div className="w-4 h-px bg-gray-700 mx-1" />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

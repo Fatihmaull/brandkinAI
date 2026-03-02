@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { api } from '@/lib/api';
-import { Sparkles, Building2, Target, Palette, MessageSquare } from 'lucide-react';
+import { Sparkles, Building2, Target, Palette, MessageSquare, Loader2 } from 'lucide-react';
 
 interface BrandDNAWizardProps {
   onProjectCreated: (projectId: string) => void;
@@ -68,35 +68,36 @@ export default function BrandDNAWizard({ onProjectCreated }: BrandDNAWizardProps
     };
 
     const { data, error } = await api.createProject(brandBrief);
+    const projectData = data as any;
 
     if (error) {
       alert(`Failed to create project: ${error}`);
-    } else if (data?.project_id) {
-      onProjectCreated(data.project_id);
+    } else if (projectData?.project_id) {
+      onProjectCreated(projectData.project_id);
     }
 
     setIsSubmitting(false);
   };
 
   return (
-    <div className="glass rounded-2xl p-8 max-w-4xl mx-auto">
-      <div className="flex items-center gap-3 mb-8">
-        <Sparkles className="w-8 h-8 text-brand-500" />
-        <h2 className="text-2xl font-bold">Brand DNA Wizard</h2>
+    <div>
+      {/* Header */}
+      <div className="text-center mb-8">
+        <h2 className="text-xl font-medium text-gray-300 mb-2">Describe your brand and let AI do the rest</h2>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {/* Brand Name */}
         <div>
-          <label className="flex items-center gap-2 text-sm font-medium mb-2">
-            <Building2 className="w-4 h-4" />
+          <label className="flex items-center gap-2 text-sm font-medium mb-2 text-gray-300">
+            <Building2 className="w-4 h-4 text-gray-400" />
             Brand Name
           </label>
           <input
             type="text"
             value={formData.brand_name}
             onChange={(e) => setFormData({ ...formData, brand_name: e.target.value })}
-            className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-brand-500 focus:outline-none"
+            className="w-full px-4 py-3 studio-input"
             placeholder="Enter your brand name"
             required
           />
@@ -104,12 +105,12 @@ export default function BrandDNAWizard({ onProjectCreated }: BrandDNAWizardProps
 
         {/* Industry */}
         <div>
-          <label className="text-sm font-medium mb-2 block">Industry</label>
+          <label className="text-sm font-medium mb-2 block text-gray-300">Industry</label>
           <input
             type="text"
             value={formData.industry}
             onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
-            className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-brand-500 focus:outline-none"
+            className="w-full px-4 py-3 studio-input"
             placeholder="e.g., Technology, Fashion, Food & Beverage"
             required
           />
@@ -117,14 +118,14 @@ export default function BrandDNAWizard({ onProjectCreated }: BrandDNAWizardProps
 
         {/* Target Audience */}
         <div>
-          <label className="flex items-center gap-2 text-sm font-medium mb-2">
-            <Target className="w-4 h-4" />
+          <label className="flex items-center gap-2 text-sm font-medium mb-2 text-gray-300">
+            <Target className="w-4 h-4 text-gray-400" />
             Target Audience
           </label>
           <textarea
             value={formData.target_audience}
             onChange={(e) => setFormData({ ...formData, target_audience: e.target.value })}
-            className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-brand-500 focus:outline-none h-20"
+            className="w-full px-4 py-3 studio-input h-20 resize-none"
             placeholder="Describe your ideal customers..."
             required
           />
@@ -132,17 +133,17 @@ export default function BrandDNAWizard({ onProjectCreated }: BrandDNAWizardProps
 
         {/* Brand Personality */}
         <div>
-          <label className="text-sm font-medium mb-3 block">Brand Personality (Select up to 4)</label>
+          <label className="text-sm font-medium mb-3 block text-gray-300">Brand Personality (Select up to 4)</label>
           <div className="flex flex-wrap gap-2">
             {PERSONALITY_OPTIONS.map((personality) => (
               <button
                 key={personality}
                 type="button"
                 onClick={() => handlePersonalityToggle(personality)}
-                className={`px-4 py-2 rounded-full text-sm transition-all ${
+                className={`px-4 py-2 rounded-lg text-sm transition-all ${
                   formData.brand_personality.includes(personality)
-                    ? 'bg-brand-500 text-white'
-                    : 'bg-white/5 hover:bg-white/10 border border-white/10'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300'
                 }`}
               >
                 {personality}
@@ -153,45 +154,45 @@ export default function BrandDNAWizard({ onProjectCreated }: BrandDNAWizardProps
 
         {/* Visual Style */}
         <div>
-          <label className="flex items-center gap-2 text-sm font-medium mb-2">
-            <Palette className="w-4 h-4" />
+          <label className="flex items-center gap-2 text-sm font-medium mb-2 text-gray-300">
+            <Palette className="w-4 h-4 text-gray-400" />
             Visual Style Preference
           </label>
           <select
             value={formData.visual_style}
             onChange={(e) => setFormData({ ...formData, visual_style: e.target.value })}
-            className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-brand-500 focus:outline-none"
+            className="w-full px-4 py-3 studio-input"
             required
           >
             <option value="">Select a style...</option>
             {VISUAL_STYLES.map((style) => (
-              <option key={style} value={style}>{style}</option>
+              <option key={style} value={style} className="bg-gray-800">{style}</option>
             ))}
           </select>
         </div>
 
         {/* Color Preferences */}
         <div>
-          <label className="text-sm font-medium mb-2 block">Color Preferences (Optional)</label>
+          <label className="text-sm font-medium mb-2 block text-gray-300">Color Preferences (Optional)</label>
           <input
             type="text"
             value={formData.color_preferences}
             onChange={(e) => setFormData({ ...formData, color_preferences: e.target.value })}
-            className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-brand-500 focus:outline-none"
+            className="w-full px-4 py-3 studio-input"
             placeholder="e.g., Blue and orange, Earth tones, Bright and vibrant"
           />
         </div>
 
         {/* Brand Story */}
         <div>
-          <label className="flex items-center gap-2 text-sm font-medium mb-2">
-            <MessageSquare className="w-4 h-4" />
+          <label className="flex items-center gap-2 text-sm font-medium mb-2 text-gray-300">
+            <MessageSquare className="w-4 h-4 text-gray-400" />
             Brand Story / Description
           </label>
           <textarea
             value={formData.brand_story}
             onChange={(e) => setFormData({ ...formData, brand_story: e.target.value })}
-            className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-brand-500 focus:outline-none h-32"
+            className="w-full px-4 py-3 studio-input h-32 resize-none"
             placeholder="Tell us about your brand's mission, values, and what makes it unique..."
             required
           />
@@ -201,15 +202,18 @@ export default function BrandDNAWizard({ onProjectCreated }: BrandDNAWizardProps
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full py-4 bg-gradient-to-r from-brand-500 to-alchemy-accent text-white font-bold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full py-3 studio-btn flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSubmitting ? (
-            <span className="flex items-center justify-center gap-2">
-              <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
               Creating Your Brand...
-            </span>
+            </>
           ) : (
-            'Start Brand Alchemy'
+            <>
+              <Sparkles className="w-4 h-4" />
+              Create Brand
+            </>
           )}
         </button>
       </form>

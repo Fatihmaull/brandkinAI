@@ -8,7 +8,7 @@ import uuid
 from typing import Dict, Any
 
 from utils.database import db
-from utils.dashscope_client import dashscope_client, DEFAULT_SEED
+from utils.ai_client import ai_client, DEFAULT_SEED
 from utils.oss_handler import oss_handler
 from prompts.stage_prompts import prompts
 
@@ -116,7 +116,7 @@ User Feedback: {revision_feedback}
 Generate an improved prompt addressing the feedback while maintaining brand consistency."""
         
         # Get revised prompt from qwen-max
-        revision_data = dashscope_client.call_qwen_max(
+        revision_data = ai_client.call_qwen_max(
             system_prompt=prompt_config['system_prompt'],
             user_prompt=user_prompt,
             temperature=0.7,
@@ -140,10 +140,10 @@ Generate an improved prompt addressing the feedback while maintaining brand cons
         )
         
         # Generate with wanx-v1 (seed=42 for consistency)
-        new_image_url = dashscope_client.call_wanx_with_retry(
+        new_image_url = ai_client.call_wanx_with_retry(
             prompt=revised_prompt,
             seed=DEFAULT_SEED,
-            size="1024*1024"
+            size="1024x1024"  # Use 'x' format for wan2.2-t2i-flash
         )
         
         # Upload to OSS
@@ -151,7 +151,7 @@ Generate an improved prompt addressing the feedback while maintaining brand cons
         new_oss_url = oss_handler.upload_with_retry(new_image_url, new_oss_key)
         
         # Remove background
-        new_transparent_url = dashscope_client.remove_background(new_image_url)
+        new_transparent_url = ai_client.remove_background(new_image_url)
         new_transparent_oss_key = f"projects/{project_id}/{asset_type}_revised_{new_asset_id}_transparent.png"
         new_transparent_oss_url = oss_handler.upload_with_retry(
             new_transparent_url, new_transparent_oss_key

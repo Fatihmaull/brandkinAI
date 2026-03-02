@@ -9,7 +9,7 @@ import uuid
 from typing import Dict, Any, List
 
 from utils.database import db
-from utils.dashscope_client import dashscope_client, DEFAULT_SEED
+from utils.ai_client import ai_client, DEFAULT_SEED
 from utils.oss_handler import oss_handler
 from prompts.stage_prompts import prompts
 
@@ -84,7 +84,7 @@ def process_stage2(project_id: str, brand_dna: Dict) -> Dict[str, Any]:
 
 Create detailed prompts for mascot and avatar generation."""
         
-        image_prompts = dashscope_client.call_qwen_max(
+        image_prompts = ai_client.call_qwen_max(
             system_prompt=prompt_config['system_prompt'],
             user_prompt=user_prompt,
             temperature=0.8,
@@ -98,22 +98,19 @@ Create detailed prompts for mascot and avatar generation."""
             metadata={'prompt': image_prompts.get('mascot_prompt', '')}
         )
         
-        mascot_url = dashscope_client.call_wanx_with_retry(
+        mascot_url = ai_client.call_wanx_with_retry(
             prompt=image_prompts.get('mascot_prompt', ''),
             seed=DEFAULT_SEED,  # CRITICAL: Consistency rule
-            size="1024*1024"
+            size="1024x1024"  # Use 'x' format for wan2.2-t2i-flash
         )
         
-        # Upload mascot to OSS
-        mascot_oss_key = f"projects/{project_id}/mascot_{mascot_asset_id}.png"
-        mascot_oss_url = oss_handler.upload_with_retry(mascot_url, mascot_oss_key)
+        # Use the generated image URL directly (already hosted on DashScope OSS)
+        # For local development, we skip re-uploading to avoid access issues
+        mascot_oss_url = mascot_url
         
-        # Remove background from mascot
-        mascot_transparent_url = dashscope_client.remove_background(mascot_url)
-        mascot_transparent_oss_key = f"projects/{project_id}/mascot_{mascot_asset_id}_transparent.png"
-        mascot_transparent_oss_url = oss_handler.upload_with_retry(
-            mascot_transparent_url, mascot_transparent_oss_key
-        )
+        # Remove background from mascot (returns same URL for now)
+        mascot_transparent_url = ai_client.remove_background(mascot_url)
+        mascot_transparent_oss_url = mascot_transparent_url
         
         # Update mascot asset
         db.update_asset_urls(
@@ -129,22 +126,18 @@ Create detailed prompts for mascot and avatar generation."""
             metadata={'prompt': image_prompts.get('avatar_prompt', '')}
         )
         
-        avatar_url = dashscope_client.call_wanx_with_retry(
+        avatar_url = ai_client.call_wanx_with_retry(
             prompt=image_prompts.get('avatar_prompt', ''),
             seed=DEFAULT_SEED,  # CRITICAL: Consistency rule
-            size="1024*1024"
+            size="1024x1024"  # Use 'x' format for wan2.2-t2i-flash
         )
         
-        # Upload avatar to OSS
-        avatar_oss_key = f"projects/{project_id}/avatar_{avatar_asset_id}.png"
-        avatar_oss_url = oss_handler.upload_with_retry(avatar_url, avatar_oss_key)
+        # Use the generated image URL directly
+        avatar_oss_url = avatar_url
         
-        # Remove background from avatar
-        avatar_transparent_url = dashscope_client.remove_background(avatar_url)
-        avatar_transparent_oss_key = f"projects/{project_id}/avatar_{avatar_asset_id}_transparent.png"
-        avatar_transparent_oss_url = oss_handler.upload_with_retry(
-            avatar_transparent_url, avatar_transparent_oss_key
-        )
+        # Remove background from avatar (returns same URL for now)
+        avatar_transparent_url = ai_client.remove_background(avatar_url)
+        avatar_transparent_oss_url = avatar_transparent_url
         
         # Update avatar asset
         db.update_asset_urls(

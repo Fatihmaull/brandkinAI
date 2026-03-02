@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
+import { Check, RefreshCw, Sparkles } from 'lucide-react';
 
 interface Asset {
   asset_id: string;
@@ -12,7 +12,7 @@ interface Asset {
 interface CharacterSelectionProps {
   mascot: Asset;
   avatar: Asset;
-  onSelect: (assetId: string) => void;
+  onSelect: (assetId: string, type: string) => void;
   onRegenerate: () => void;
 }
 
@@ -20,98 +20,100 @@ export default function CharacterSelection({ mascot, avatar, onSelect, onRegener
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSelect = async (assetId: string) => {
+  const handleSelect = async (assetId: string, type: string) => {
     setSelectedId(assetId);
     setIsSubmitting(true);
     try {
-      await onSelect(assetId);
+      await onSelect(assetId, type);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg p-6 mt-6">
-      <h3 className="text-xl font-semibold text-white mb-4">Select Your Brand Character</h3>
-      <p className="text-gray-400 mb-6">
-        Choose the character that best represents your brand. This will be used for all pose variations and code components.
+    <div className="studio-card p-6">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+          <Sparkles className="w-4 h-4 text-blue-400" />
+        </div>
+        <h3 className="text-lg font-medium text-white">Select Your Brand Character</h3>
+      </div>
+      <p className="text-sm text-gray-400 mb-6 ml-11">
+        Choose the character that best represents your brand
       </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Mascot Option */}
         <div
-          onClick={() => handleSelect(mascot.asset_id)}
-          className={`relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
+          onClick={() => !isSubmitting && handleSelect(mascot.asset_id, 'mascot')}
+          className={`relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
             selectedId === mascot.asset_id
-              ? 'border-green-500 ring-2 ring-green-500'
-              : 'border-gray-600 hover:border-gray-500'
-          }`}
+              ? 'border-blue-500 bg-blue-500/5'
+              : 'border-[#3c3c43] hover:border-[#48484f] hover:bg-[#1c1c1e]'
+          } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
-          <div className="aspect-square relative bg-gray-700">
+          <div className="aspect-square relative bg-[#0d0d0d]">
             <img
               src={mascot.oss_url}
               alt="Brand Mascot"
-              className="w-full h-full object-contain"
+              className="w-full h-full object-contain p-6"
             />
           </div>
-          <div className="p-4 bg-gray-750">
-            <h4 className="text-white font-medium">Brand Mascot</h4>
-            <p className="text-sm text-gray-400">Full-body character</p>
+          <div className="p-4 border-t border-[#3c3c43]">
+            <h4 className="text-white font-medium text-sm">Brand Mascot</h4>
+            <p className="text-xs text-gray-500 mt-0.5">Full-body character</p>
           </div>
           {selectedId === mascot.asset_id && (
-            <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
+            <div className="absolute top-3 right-3 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center">
+              <Check className="w-4 h-4" />
             </div>
           )}
         </div>
 
         {/* Avatar Option */}
         <div
-          onClick={() => handleSelect(avatar.asset_id)}
-          className={`relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
+          onClick={() => !isSubmitting && handleSelect(avatar.asset_id, 'avatar')}
+          className={`relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
             selectedId === avatar.asset_id
-              ? 'border-green-500 ring-2 ring-green-500'
-              : 'border-gray-600 hover:border-gray-500'
-          }`}
+              ? 'border-blue-500 bg-blue-500/5'
+              : 'border-[#3c3c43] hover:border-[#48484f] hover:bg-[#1c1c1e]'
+          } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
-          <div className="aspect-square relative bg-gray-700">
+          <div className="aspect-square relative bg-[#0d0d0d]">
             <img
               src={avatar.oss_url}
               alt="Brand Avatar"
-              className="w-full h-full object-contain"
+              className="w-full h-full object-contain p-6"
             />
           </div>
-          <div className="p-4 bg-gray-750">
-            <h4 className="text-white font-medium">Brand Avatar</h4>
-            <p className="text-sm text-gray-400">Portrait/headshot character</p>
+          <div className="p-4 border-t border-[#3c3c43]">
+            <h4 className="text-white font-medium text-sm">Brand Avatar</h4>
+            <p className="text-xs text-gray-500 mt-0.5">Portrait/headshot character</p>
           </div>
           {selectedId === avatar.asset_id && (
-            <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
+            <div className="absolute top-3 right-3 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center">
+              <Check className="w-4 h-4" />
             </div>
           )}
         </div>
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-4 mt-6">
+      <div className="flex gap-3 mt-6">
         <button
           onClick={onRegenerate}
           disabled={isSubmitting}
-          className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 transition-colors"
+          className="studio-btn-secondary flex items-center gap-2"
         >
+          <RefreshCw className={`w-4 h-4 ${isSubmitting ? 'animate-spin' : ''}`} />
           Regenerate Characters
         </button>
       </div>
 
       {isSubmitting && (
-        <div className="mt-4 text-center text-gray-400">
-          <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-          Processing selection...
+        <div className="mt-4 flex items-center justify-center gap-3 text-gray-400 bg-[#1c1c1e] rounded-lg p-4">
+          <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-sm">Processing your selection...</span>
         </div>
       )}
     </div>
