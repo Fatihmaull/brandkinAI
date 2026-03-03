@@ -48,6 +48,8 @@ function AssetsContent() {
   useEffect(() => {
     if (projectId) {
       loadData(projectId);
+    } else {
+      setIsLoading(false);
     }
   }, [projectId]);
 

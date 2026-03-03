@@ -6,9 +6,9 @@ set -e
 
 echo "=== BrandKin AI Frontend Deployment ==="
 
-# Configuration
-OSS_BUCKET="brandkin-ai-frontend"
-OSS_ENDPOINT="oss-cn-hangzhou.aliyuncs.com"
+# Configuration — override with environment variables
+OSS_BUCKET="${OSS_BUCKET:-brandkin-ai-frontend}"
+OSS_ENDPOINT="${OSS_ENDPOINT:-oss-cn-hangzhou.aliyuncs.com}"
 BUILD_DIR="nextjs-app/dist"
 
 # Colors for output
@@ -30,7 +30,7 @@ cd "$(dirname "$0")"
 # Install dependencies
 echo -e "${YELLOW}Installing dependencies...${NC}"
 cd nextjs-app
-npm install
+npm ci
 
 # Build the project
 echo -e "${YELLOW}Building Next.js project...${NC}"
@@ -39,7 +39,7 @@ npm run build
 cd ..
 
 # Sync to OSS
-echo -e "${YELLOW}Deploying to OSS...${NC}"
+echo -e "${YELLOW}Deploying to OSS bucket: ${OSS_BUCKET}...${NC}"
 ossutil cp -r -f "$BUILD_DIR/" "oss://$OSS_BUCKET/"
 
 # Set cache headers for static assets
@@ -48,4 +48,4 @@ ossutil set-meta "oss://$OSS_BUCKET/_next/static/" "Cache-Control:public,max-age
 ossutil set-meta "oss://$OSS_BUCKET/" "Content-Type:text/html" --include "*.html" --update -r
 
 echo -e "${GREEN}Deployment complete!${NC}"
-echo -e "${GREEN}Your site is available at: https://$OSS_BUCKET.$OSS_ENDPOINT/${NC}"
+echo -e "${GREEN}Your site is available at: https://${OSS_BUCKET}.${OSS_ENDPOINT}/${NC}"

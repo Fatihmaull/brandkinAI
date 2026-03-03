@@ -4,9 +4,10 @@ FC 3.0 HTTP handler for API Gateway routes
 """
 
 import json
-from typing import Dict, Any
+import logging
+import re
+from typing import Dict, Any, Optional
 
-# Import stage handlers
 import sys
 sys.path.append('/code')  # FC 3.0 working directory
 
@@ -22,6 +23,12 @@ from stage_handlers import (
 )
 from utils.database import db
 
+logger = logging.getLogger(__name__)
+
+# Allowed CORS origins (configure via env var for production)
+import os
+CORS_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '*')
+
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
@@ -30,22 +37,23 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Routes:
     - POST /api/v1/projects -> Stage 0: Initialize
     - GET  /api/v1/projects/{id} -> Get project status
+    - GET  /api/v1/projects/{id}/assets -> Get project assets
+    - GET  /api/v1/projects/{id}/code -> Get code exports
     - POST /api/v1/projects/{id}/select -> Stage 3: Character selection
     - POST /api/v1/projects/{id}/revise -> Stage 6: Revision
     - POST /api/v1/projects/{id}/finalize -> Stage 7: Assembly
+    - GET  /health -> Health check
     """
     
-    # Parse request
     http_method = event.get('httpMethod', 'GET')
     path = event.get('path', '')
     path_params = event.get('pathParameters', {}) or {}
     
-    # CORS headers
     headers = {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': CORS_ORIGINS,
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-App-Key, X-Timestamp, X-Nonce, X-Signature'
     }
     
     # Handle OPTIONS for CORS
@@ -53,53 +61,104 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {'statusCode': 200, 'headers': headers, 'body': ''}
     
     try:
-        # Route: Create project (Stage 0)
-        if http_method == 'POST' and path == '/api/v1/projects':
+        # Parse route
+        route = _match_route(http_method, path, path_params)
+        
+        if route == 'health':
+            return {
+                'statusCode': 200,
+                'headers': headers,
+                'body': json.dumps({'status': 'ok', 'service': 'BrandKin AI'})
+            }
+        
+        if route == 'create_project':
             return stage0_init.handler(event, context)
         
-        # Route: Get project status
-        if http_method == 'GET' and '/api/v1/projects/' in path:
-            project_id = path_params.get('id')
+        if route == 'get_project':
+            project_id = path_params.get('id') or _extract_project_id(path)
             if project_id:
                 return get_project_status(project_id, headers)
         
-        # Route: Character selection (Stage 3)
-        if http_method == 'POST' and '/select' in path:
-            return stage3_selection.handler(event, context)
-        
-        # Route: Revision request (Stage 6)
-        if http_method == 'POST' and '/revise' in path:
-            return stage6_revision.handler(event, context)
-        
-        # Route: Finalize/Assembly (Stage 7)
-        if http_method == 'POST' and '/finalize' in path:
-            return stage7_assembly.handler(event, context)
-        
-        # Route: Get project assets
-        if http_method == 'GET' and '/assets' in path:
-            project_id = path_params.get('id')
+        if route == 'get_assets':
+            project_id = path_params.get('id') or _extract_project_id(path)
             if project_id:
                 return get_project_assets(project_id, headers)
         
-        # Route: Get code exports
-        if http_method == 'GET' and '/code' in path:
-            project_id = path_params.get('id')
+        if route == 'get_code':
+            project_id = path_params.get('id') or _extract_project_id(path)
             if project_id:
                 return get_code_exports(project_id, headers)
+        
+        if route == 'select_character':
+            return stage3_selection.handler(event, context)
+        
+        if route == 'revise':
+            return stage6_revision.handler(event, context)
+        
+        if route == 'finalize':
+            return stage7_assembly.handler(event, context)
         
         # 404 for unmatched routes
         return {
             'statusCode': 404,
             'headers': headers,
-            'body': json.dumps({'error': 'Route not found', 'path': path})
+            'body': json.dumps({'error': 'Route not found'})
         }
         
     except Exception as e:
+        logger.error(f"API handler error on {http_method} {path}: {e}", exc_info=True)
         return {
             'statusCode': 500,
             'headers': headers,
-            'body': json.dumps({'error': str(e)})
+            'body': json.dumps({'error': 'Internal server error'})
         }
+
+
+def _match_route(method: str, path: str, path_params: dict) -> str:
+    """Match HTTP method + path to a named route.
+    
+    Uses explicit path matching to avoid ambiguous substring matches.
+    """
+    # Normalize path
+    path = path.rstrip('/')
+    
+    if method == 'GET' and path == '/health':
+        return 'health'
+    
+    if method == 'POST' and path == '/api/v1/projects':
+        return 'create_project'
+    
+    # Match: /api/v1/projects/{id}/select
+    if method == 'POST' and re.match(r'^/api/v1/projects/[^/]+/select$', path):
+        return 'select_character'
+    
+    # Match: /api/v1/projects/{id}/revise
+    if method == 'POST' and re.match(r'^/api/v1/projects/[^/]+/revise$', path):
+        return 'revise'
+    
+    # Match: /api/v1/projects/{id}/finalize
+    if method == 'POST' and re.match(r'^/api/v1/projects/[^/]+/finalize$', path):
+        return 'finalize'
+    
+    # Match: /api/v1/projects/{id}/assets
+    if method == 'GET' and re.match(r'^/api/v1/projects/[^/]+/assets$', path):
+        return 'get_assets'
+    
+    # Match: /api/v1/projects/{id}/code
+    if method == 'GET' and re.match(r'^/api/v1/projects/[^/]+/code$', path):
+        return 'get_code'
+    
+    # Match: /api/v1/projects/{id} (must be last to avoid catching sub-routes)
+    if method == 'GET' and re.match(r'^/api/v1/projects/[^/]+$', path):
+        return 'get_project'
+    
+    return 'not_found'
+
+
+def _extract_project_id(path: str) -> Optional[str]:
+    """Extract project ID from path like /api/v1/projects/{id}/..."""
+    match = re.match(r'^/api/v1/projects/([^/]+)', path)
+    return match.group(1) if match else None
 
 
 def get_project_status(project_id: str, headers: Dict) -> Dict[str, Any]:
@@ -122,17 +181,15 @@ def get_project_status(project_id: str, headers: Dict) -> Dict[str, Any]:
         'total': len(assets)
     }
     
-    # Get code exports
     code_exports = db.get_code_exports(project_id)
-    
-    # Get brand kit if available
     brand_kit = db.get_brand_kit(project_id)
     
-    # Build response
     response = {
         'project_id': project_id,
         'status': project.get('status'),
         'current_stage': project.get('current_stage'),
+        'brand_brief': project.get('brand_brief'),
+        'brand_dna': json.loads(project['brand_dna']) if project.get('brand_dna') and isinstance(project['brand_dna'], str) else project.get('brand_dna'),
         'created_at': project.get('created_at').isoformat() if project.get('created_at') else None,
         'updated_at': project.get('updated_at').isoformat() if project.get('updated_at') else None,
         'assets': asset_summary,
@@ -185,7 +242,6 @@ def get_project_assets(project_id: str, headers: Dict) -> Dict[str, Any]:
     
     assets = db.get_project_assets(project_id)
     
-    # Format assets for response
     formatted_assets = []
     for asset in assets:
         formatted_assets.append({
@@ -222,7 +278,6 @@ def get_code_exports(project_id: str, headers: Dict) -> Dict[str, Any]:
     
     exports = db.get_code_exports(project_id)
     
-    # Format exports for response
     formatted_exports = []
     for export in exports:
         formatted_exports.append({

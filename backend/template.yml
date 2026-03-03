@@ -7,10 +7,10 @@ Parameters:
     Default: brandkin-ai-service
     Description: FC Service Name
   
-  DashScopeApiKey:
+  ModelStudioApiKey:
     Type: String
     NoEcho: true
-    Description: DashScope API Key
+    Description: Model Studio (DashScope International) API Key
   
   OssBucket:
     Type: String
@@ -25,6 +25,11 @@ Parameters:
     Type: String
     NoEcho: true
     Description: RDS MySQL Password
+  
+  MnsAccountId:
+    Type: String
+    Default: '000000000'
+    Description: MNS Account ID for endpoint URL
 
 Resources:
   # FC Service
@@ -37,7 +42,7 @@ Resources:
         Project: brandkin-ai-logs
         Logstore: function-logs
       EnvironmentVariables:
-        DASHSCOPE_API_KEY: !Ref DashScopeApiKey
+        MODELSTUDIO_API_KEY: !Ref ModelStudioApiKey
         OSS_BUCKET: !Ref OssBucket
         OSS_ENDPOINT: oss-cn-hangzhou.aliyuncs.com
         OSS_REGION: cn-hangzhou
@@ -46,8 +51,9 @@ Resources:
         RDS_DATABASE: brandkin_ai
         RDS_USER: brandkin_admin
         RDS_PASSWORD: !Ref RdsPassword
-        MNS_ENDPOINT: https://123456789.mns.cn-hangzhou.aliyuncs.com
+        MNS_ENDPOINT: !Sub 'https://${MnsAccountId}.mns.cn-hangzhou.aliyuncs.com'
         MNS_QUEUE_NAME: brandkin-generation-tasks
+        CORS_ALLOWED_ORIGINS: '*'
 
   # HTTP API Function
   ApiHandlerFunction:
@@ -192,7 +198,7 @@ Resources:
           RegionId: cn-hangzhou
           ServiceName: !Ref BrandKinService
           FunctionName: api-handler
-        ContentTypeCatagory: DEFAULT
+        ContentTypeCategory: DEFAULT
       RequestParameters: []
       StageName: RELEASE
 

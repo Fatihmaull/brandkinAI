@@ -47,6 +47,8 @@ function ComponentsContent() {
   useEffect(() => {
     if (projectId) {
       loadData(projectId);
+    } else {
+      setIsLoading(false);
     }
   }, [projectId]);
 

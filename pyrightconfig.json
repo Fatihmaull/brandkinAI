@@ -1,0 +1,13 @@
+{
+    "executionEnvironments": [
+        {
+            "root": "backend/fc-functions",
+            "extraPaths": [
+                "backend/fc-functions"
+            ]
+        }
+    ],
+    "reportMissingImports": "warning",
+    "reportMissingModuleSource": "none",
+    "pythonVersion": "3.10"
+}

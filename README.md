@@ -1,164 +1,116 @@
-# BrandKin AI - End-to-End Implementation
+# BrandKin AI
 
-AI-powered brand identity creation platform built on Alibaba Cloud.
+AI-powered brand identity creation platform built on Alibaba Cloud services.
 
-## Architecture Overview
+## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        FRONTEND (OSS)                           │
-│                   Next.js + React + Tailwind                    │
-└──────────────────────┬──────────────────────────────────────────┘
-                       │ HTTPS
-                       ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      API GATEWAY                                │
-│              AppKey + AppSecret Authentication                  │
-└──────────────────────┬──────────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────────┐
-│              FUNCTION COMPUTE 3.0 (Python 3.10)                 │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐  │
-│  │ Stage 0 │ │ Stage 1 │ │ Stage 2 │ │ Stage 4 │ │ Stage 5 │  │
-│  │  Init   │ │   DNA   │ │ Visual  │ │  Poses  │ │  Code   │  │
-│  └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘  │
-│  ┌─────────┐ ┌─────────┐                                       │
-│  │ Stage 6 │ │ Stage 7 │                                       │
-│  │ Revision│ │Assembly │                                       │
-│  └─────────┘ └─────────┘                                       │
-└──────────────────────┬──────────────────────────────────────────┘
-                       │
-        ┌──────────────┼──────────────┐
-        ▼              ▼              ▼
-┌──────────────┐ ┌──────────┐ ┌──────────────┐
-│  DashScope   │ │    OSS   │ │  RDS MySQL   │
-│ qwen-max     │ │  Assets  │ │  Metadata    │
-│ qwen-coder+  │ │  Storage │ │  Tracking    │
-│ wanx-v1      │ │          │ │              │
-└──────────────┘ └──────────┘ └──────────────┘
-```
+- **Backend**: Alibaba Cloud Function Compute 3.0 (Python 3.10)
+- **Frontend**: Next.js (static export) on Alibaba Cloud OSS
+- **Database**: RDS MySQL
+- **Storage**: OSS with signed URLs
+- **AI Models**: Model Studio (qwen-max, qwen-coder-plus, wanx-v1)
 
 ## Pipeline Stages
 
-| Stage | Name | Description | AI Model |
-|-------|------|-------------|----------|
-| 0 | Initialize | Create project, store brand brief | - |
-| 1 | Brand DNA | Analyze brand brief, extract DNA | qwen-max |
-| 2 | Visual Gen | Generate mascot & avatar | wanx-v1 (seed=42) |
-| 3 | Selection | User selects character | - |
-| 4 | Pose Pack | Generate 5 pose variations | qwen-max + wanx-v1 |
-| 5 | Code Export | Generate React component | qwen-coder-plus |
-| 6 | Revision | Handle user feedback | qwen-max + wanx-v1 |
-| 7 | Assembly | Create brand kit ZIP | qwen-max + wanx-v1 |
-
-## Technical Guardrails
-
-- **100% Alibaba Cloud**: FC, OSS, RDS, MNS, API Gateway, RAM, DashScope
-- **Seed Consistency**: All visual generation uses seed=42
-- **Security**: STS tokens via environment variables, no hardcoded credentials
-- **OSS URLs**: Signed URLs with 24-hour TTL
+| Stage | Name | AI Model | Description |
+|-------|------|----------|-------------|
+| 0 | Initialize | — | Create project |
+| 1 | Brand DNA | qwen-max | Analyze brand brief |
+| 2 | Visual Gen | wanx-v1 | Generate mascot/avatar (seed=42) |
+| 3 | Selection | — | User selects character |
+| 4 | Pose Pack | wanx-v1 | Generate 5 pose variations |
+| 5 | Code Export | qwen-coder-plus | Generate React components |
+| 6 | Revision | qwen-max + wanx-v1 | Handle user feedback |
+| 7 | Assembly | qwen-max + wanx-v1 | Create brand kit ZIP |
 
 ## Project Structure
 
 ```
 brandkin-ai/
 ├── backend/
-│   ├── fc-functions/
-│   │   ├── orchestrator/
-│   │   │   └── api_handler.py
-│   │   ├── stage_handlers/
-│   │   │   ├── stage0_init.py
-│   │   │   ├── stage1_dna.py
-│   │   │   ├── stage2_visual.py
-│   │   │   ├── stage3_selection.py
-│   │   │   ├── stage4_poses.py
-│   │   │   ├── stage5_code.py
-│   │   │   ├── stage6_revision.py
-│   │   │   └── stage7_assembly.py
-│   │   └── utils/
-│   │       ├── credentials.py
-│   │       ├── dashscope_client.py
-│   │       ├── database.py
-│   │       └── oss_handler.py
-│   ├── requirements.txt
-│   └── template.yml
+│   ├── fc-functions/           # Function Compute code
+│   │   ├── orchestrator/       # API handler (routing)
+│   │   ├── stage_handlers/     # Stage 0-7 handlers
+│   │   ├── utils/              # AI client, DB, OSS, credentials
+│   │   └── prompts/            # AI prompt templates
+│   ├── database/               # SQL schema
+│   ├── requirements.txt        # Python dependencies
+│   └── template.yml            # FC deployment template
 ├── frontend/
-│   ├── nextjs-app/
-│   │   ├── app/
-│   │   │   ├── globals.css
-│   │   │   ├── layout.tsx
-│   │   │   └── page.tsx
-│   │   ├── components/
-│   │   │   ├── BrandDNAWizard.tsx
-│   │   │   ├── StageTracker.tsx
-│   │   │   ├── AssetGallery.tsx
-│   │   │   └── CodePreview.tsx
-│   │   ├── lib/
-│   │   │   ├── api.ts
-│   │   │   └── websocket.ts
-│   │   ├── package.json
-│   │   ├── next.config.js
-│   │   └── tailwind.config.ts
-│   └── deploy-to-oss.sh
+│   ├── nextjs-app/             # Next.js application
+│   └── deploy-to-oss.sh        # Frontend deployment script
 ├── infrastructure/
-│   └── ram-policies/
-│       └── fc-role-policy.json
-└── shared/
-    └── prompts/
-        └── stage_prompts.py
+│   └── ram-policies/           # IAM policies
+└── .env.example                # Environment variable template
 ```
 
-## Deployment
+## Setup
 
-### Backend (Function Compute)
+### Prerequisites
+
+- Alibaba Cloud account with:
+  - Function Compute 3.0
+  - RDS MySQL instance
+  - OSS bucket
+  - Model Studio API key (DashScope International)
+- Node.js 18+ (frontend)
+- Python 3.10+ (backend)
+- [Serverless Devs CLI](https://www.serverless-devs.com/) (`s` command)
+- [ossutil](https://www.alibabacloud.com/help/doc-detail/120075.htm)
+
+### Environment Variables
+
+Copy `.env.example` and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+Key variables:
+- `MODELSTUDIO_API_KEY` — Model Studio API key (required)
+- `OSS_BUCKET` / `OSS_ENDPOINT` — OSS configuration
+- `RDS_HOST` / `RDS_PASSWORD` — Database credentials
+- `MNS_ENDPOINT` — Message queue endpoint
+
+### Database Setup
+
+Run the schema on your RDS instance:
+
+```bash
+mysql -h <RDS_HOST> -u brandkin_admin -p brandkin_ai < backend/database/init_schema.sql
+```
+
+### Backend Deployment
 
 ```bash
 cd backend
-# Install dependencies
 pip install -r requirements.txt
-
-# Deploy using Fun (Serverless Devs)
-s deploy
+s deploy  # Deploy to FC using template.yml
 ```
 
-### Frontend (OSS)
+### Frontend Deployment
 
 ```bash
 cd frontend
-# Make deploy script executable and run
-chmod +x deploy-to-oss.sh
-./deploy-to-oss.sh
+OSS_BUCKET=your-bucket OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com ./deploy-to-oss.sh
 ```
-
-## Environment Variables
-
-### Backend (FC)
-- `ALIBABA_CLOUD_ACCESS_KEY_ID` - STS Access Key
-- `ALIBABA_CLOUD_ACCESS_KEY_SECRET` - STS Secret
-- `ALIBABA_CLOUD_SECURITY_TOKEN` - STS Token
-- `DASHSCOPE_API_KEY` - DashScope API Key
-- `OSS_BUCKET` - OSS Bucket name
-- `RDS_HOST`, `RDS_USER`, `RDS_PASSWORD` - RDS credentials
-
-### Frontend
-- `NEXT_PUBLIC_API_BASE_URL` - API Gateway endpoint
-- `NEXT_PUBLIC_WEBSOCKET_URL` - WebSocket endpoint
-- `NEXT_PUBLIC_APP_KEY` - API Gateway AppKey
-- `NEXT_PUBLIC_APP_SECRET` - API Gateway AppSecret
 
 ## API Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | /api/v1/projects | Create new project (Stage 0) |
-| GET | /api/v1/projects/{id} | Get project status |
-| GET | /api/v1/projects/{id}/assets | Get project assets |
-| POST | /api/v1/projects/{id}/select | Select character (Stage 3) |
-| POST | /api/v1/projects/{id}/revise | Request revision (Stage 6) |
-| POST | /api/v1/projects/{id}/finalize | Finalize brand kit (Stage 7) |
-| GET | /api/v1/projects/{id}/code | Get code exports |
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Health check |
+| POST | `/api/v1/projects` | Create project |
+| GET | `/api/v1/projects/{id}` | Get project status |
+| GET | `/api/v1/projects/{id}/assets` | Get assets |
+| GET | `/api/v1/projects/{id}/code` | Get code exports |
+| POST | `/api/v1/projects/{id}/select` | Select character |
+| POST | `/api/v1/projects/{id}/revise` | Request revision |
+| POST | `/api/v1/projects/{id}/finalize` | Generate brand kit |
 
-## License
+## Technical Guardrails
 
-Copyright 2026 BrandKin AI. All rights reserved.
+- **Seed 42**: All image generation uses seed=42 for mascot/avatar consistency
+- **Signed URLs**: OSS URLs expire after 24 hours
+- **STS Auth**: FC uses RAM role for secure credential injection
+- **No client-side secrets**: API Gateway authentication is server-side

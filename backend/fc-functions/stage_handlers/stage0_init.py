@@ -5,10 +5,14 @@ Accepts brand_brief JSON, initializes project in RDS, triggers Stage 1.
 
 import json
 import uuid
+import logging
+import threading
 from typing import Dict, Any
 
 from utils.database import db
 from utils.credentials import get_mns_config
+
+logger = logging.getLogger(__name__)
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -43,8 +47,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         # Create project in database
         db.create_project(project_id, brand_brief)
+        logger.info(f"Project {project_id} created in database")
         
-        # Trigger Stage 1 via MNS (async)
+        # Trigger Stage 1 asynchronously (non-blocking)
         trigger_stage1(project_id, brand_brief)
         
         return {
@@ -59,6 +64,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         }
         
     except Exception as e:
+        logger.error(f"Stage 0 failed: {e}", exc_info=True)
         return {
             'statusCode': 500,
             'headers': {'Content-Type': 'application/json'},
@@ -68,22 +74,23 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
 def trigger_stage1(project_id: str, brand_brief: Dict):
     """
-    Send message to MNS queue to trigger Stage 1 processing.
+    Trigger Stage 1 processing in a background thread.
     
-    Args:
-        project_id: Project UUID
-        brand_brief: Original brand brief data
+    In production, this would send a message to MNS queue.
+    For local dev, we run it in a thread so the API returns immediately.
     """
-    # In production, this would send to MNS queue
-    # For now, we'll import and call directly
-    from .stage1_dna import process_stage1
+    def _run_stage1():
+        try:
+            from .stage1_dna import process_stage1
+            process_stage1(project_id, brand_brief)
+        except Exception as e:
+            logger.error(f"Stage 1 background processing failed for {project_id}: {e}", exc_info=True)
+            try:
+                db.update_project_status(project_id, 'failed', stage=1, error=str(e))
+            except Exception:
+                pass
     
-    # Async processing would be:
-    # mns_client.send_message({
-    #     'project_id': project_id,
-    #     'stage': 1,
-    #     'brand_brief': brand_brief
-    # })
-    
-    # Direct call for synchronous flow
-    process_stage1(project_id, brand_brief)
+    thread = threading.Thread(target=_run_stage1, daemon=True)
+    thread.start()
+    logger.info(f"Stage 1 triggered in background for project {project_id}")
+

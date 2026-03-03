@@ -118,7 +118,6 @@ GROUP BY p.project_id;
 -- Insert sample data for testing (optional)
 -- Uncomment below to add a test project
 
-/*
 INSERT INTO projects (project_id, brand_brief, status, current_stage) VALUES
 ('test-project-001', 
  '{"brand_name": "Test Brand", "brand_personality": ["innovative", "friendly"], "brand_story": "A test brand for development"}',
@@ -129,4 +128,4 @@ INSERT INTO assets (asset_id, project_id, asset_type, stage, oss_url, is_selecte
 ('asset-002', 'test-project-001', 'avatar', 2, 'https://example.com/avatar.png', FALSE),
 ('asset-003', 'test-project-001', 'pose', 4, 'https://example.com/pose1.png', FALSE),
 ('asset-004', 'test-project-001', 'pose', 4, 'https://example.com/pose2.png', FALSE);
-*/
+

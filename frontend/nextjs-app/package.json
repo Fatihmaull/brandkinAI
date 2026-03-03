@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "export": "next export",
     "start": "next start",
     "lint": "next lint"
   },
@@ -22,9 +21,7 @@
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.31",
     "lucide-react": "^0.292.0",
-    "clsx": "^2.0.0",
-    "crypto-js": "^4.2.0",
-    "@types/crypto-js": "^4.2.0"
+    "clsx": "^2.0.0"
   },
   "devDependencies": {
     "eslint": "^8.52.0",

@@ -15,7 +15,8 @@ function LoadingState() {
 }
 
 interface BrandDNA {
-  brand_name: string;
+  brand_name?: string;
+  name?: string;
   brand_personality: string[];
   target_audience: {
     demographics: string;
@@ -44,6 +45,7 @@ interface BrandDNA {
 interface Project {
   project_id: string;
   brand_brief: BrandDNA;
+  brand_dna?: BrandDNA;
   status: string;
   current_stage: number;
   created_at: string;
@@ -52,13 +54,15 @@ interface Project {
 function BrandContent() {
   const searchParams = useSearchParams();
   const projectId = searchParams.get('id');
-  
+
   const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (projectId) {
       loadProject(projectId);
+    } else {
+      setIsLoading(false);
     }
   }, [projectId]);
 
@@ -93,7 +97,21 @@ function BrandContent() {
     );
   }
 
-  const dna = project.brand_brief;
+  // Use brand_dna (AI-generated from Stage 1) as primary, brand_brief (user form) as fallback
+  const dna = project.brand_dna || project.brand_brief || {};
+
+  if (!dna || (!dna.brand_name && !dna.name)) {
+    return (
+      <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-400 mb-4">Brand data not yet available. The AI is still processing.</p>
+          <Link href="/" className="studio-btn inline-block">
+            Go Home
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0d0d0d]">
@@ -108,13 +126,13 @@ function BrandContent() {
               <h1 className="text-xl font-semibold">Brand Details</h1>
             </div>
             <div className="flex gap-3">
-              <Link 
+              <Link
                 href={`/assets?id=${projectId}`}
                 className="studio-btn-secondary text-sm"
               >
                 View Assets
               </Link>
-              <Link 
+              <Link
                 href={`/components-page?id=${projectId}`}
                 className="studio-btn-secondary text-sm"
               >
@@ -131,7 +149,7 @@ function BrandContent() {
         <div className="studio-card p-8 mb-6">
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-3xl font-bold gradient-text mb-2">{dna.brand_name}</h2>
+              <h2 className="text-3xl font-bold gradient-text mb-2">{dna.brand_name || dna.name}</h2>
               <p className="text-gray-400">Project ID: {project.project_id}</p>
               <div className="flex gap-2 mt-3">
                 {dna.brand_personality?.map((trait, idx) => (
@@ -142,11 +160,10 @@ function BrandContent() {
               </div>
             </div>
             <div className="text-right">
-              <span className={`px-3 py-1 rounded-full text-sm ${
-                project.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+              <span className={`px-3 py-1 rounded-full text-sm ${project.status === 'completed' ? 'bg-green-500/20 text-green-400' :
                 project.status === 'processing' ? 'bg-yellow-500/20 text-yellow-400' :
-                'bg-blue-500/20 text-blue-400'
-              }`}>
+                  'bg-blue-500/20 text-blue-400'
+                }`}>
                 {project.status}
               </span>
               <p className="text-sm text-gray-500 mt-2">
@@ -195,7 +212,7 @@ function BrandContent() {
                 <div className="flex gap-3">
                   {dna.visual_style?.color_palette?.primary && (
                     <div className="text-center">
-                      <div 
+                      <div
                         className="w-12 h-12 rounded-lg border border-[#3c3c43]"
                         style={{ backgroundColor: dna.visual_style.color_palette.primary }}
                       />
@@ -204,7 +221,7 @@ function BrandContent() {
                   )}
                   {dna.visual_style?.color_palette?.secondary && (
                     <div className="text-center">
-                      <div 
+                      <div
                         className="w-12 h-12 rounded-lg border border-[#3c3c43]"
                         style={{ backgroundColor: dna.visual_style.color_palette.secondary }}
                       />
@@ -213,7 +230,7 @@ function BrandContent() {
                   )}
                   {dna.visual_style?.color_palette?.accent && (
                     <div className="text-center">
-                      <div 
+                      <div
                         className="w-12 h-12 rounded-lg border border-[#3c3c43]"
                         style={{ backgroundColor: dna.visual_style.color_palette.accent }}
                       />

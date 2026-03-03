@@ -1,13 +1,9 @@
 /**
  * BrandKin AI - API Client
- * Handles communication with backend API Gateway with App Authentication
+ * Handles communication with backend API
  */
 
-import CryptoJS from 'crypto-js';
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-const APP_KEY = process.env.NEXT_PUBLIC_APP_KEY || '';
-const APP_SECRET = process.env.NEXT_PUBLIC_APP_SECRET || '';
 
 interface ApiResponse<T> {
   data?: T;
@@ -15,21 +11,7 @@ interface ApiResponse<T> {
 }
 
 /**
- * Generate signature for API Gateway App Authentication
- * Uses HMAC-SHA256 with AppSecret
- */
-function generateSignature(
-  method: string,
-  path: string,
-  timestamp: string,
-  nonce: string
-): string {
-  const stringToSign = `${method}\n${path}\n${timestamp}\n${nonce}`;
-  return CryptoJS.HmacSHA256(stringToSign, APP_SECRET).toString(CryptoJS.enc.Base64);
-}
-
-/**
- * Make authenticated API request
+ * Make API request (no client-side auth — handled by API Gateway)
  */
 async function apiRequest<T>(
   method: string,
@@ -39,17 +21,8 @@ async function apiRequest<T>(
   const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const url = `${API_BASE_URL}${path}`;
   
-  // Generate authentication headers
-  const timestamp = new Date().toISOString();
-  const nonce = Math.random().toString(36).substring(2, 15);
-  const signature = generateSignature(method, path, timestamp, nonce);
-  
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'X-App-Key': APP_KEY,
-    'X-Timestamp': timestamp,
-    'X-Nonce': nonce,
-    'X-Signature': signature,
   };
   
   try {
@@ -100,6 +73,10 @@ export const api = {
   // Get code exports
   getCodeExports: (projectId: string) =>
     apiRequest('GET', `/api/v1/projects/${projectId}/code`),
+  
+  // Health check
+  health: () =>
+    apiRequest('GET', '/health'),
 };
 
 export default api;

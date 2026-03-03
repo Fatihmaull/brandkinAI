@@ -112,23 +112,12 @@ def process_assembly(project_id: str) -> Dict[str, Any]:
             project_id, assets, code_exports, brand_copy, banner_url
         )
         
-        # Step 5: Upload ZIP to OSS (or save locally in mock mode)
+        # Step 5: Upload ZIP to OSS
         zip_oss_key = f"projects/{project_id}/brandkit_{project_id}.zip"
         zip_oss_url = oss_handler.upload_data(zip_data, zip_oss_key)
         
         # Step 6: Generate signed URL (24h TTL)
-        # In mock mode, create a local file and return API download URL
-        if hasattr(oss_handler, 'use_mock') and oss_handler.use_mock:
-            import os
-            local_storage = os.path.join(os.path.dirname(__file__), '..', '..', 'local_storage')
-            os.makedirs(local_storage, exist_ok=True)
-            local_zip_path = os.path.join(local_storage, f"brandkit_{project_id}.zip")
-            with open(local_zip_path, 'wb') as f:
-                f.write(zip_data)
-            # Return API download URL
-            signed_url = f"http://localhost:5000/api/v1/download/{project_id}"
-        else:
-            signed_url = oss_handler.get_signed_url(zip_oss_key, expiration_hours=24)
+        signed_url = oss_handler.get_signed_url(zip_oss_key, expiration_hours=24)
         expires_at = datetime.utcnow() + timedelta(hours=24)
         
         # Step 7: Save brand kit record
@@ -145,7 +134,6 @@ def process_assembly(project_id: str) -> Dict[str, Any]:
         # Mark project as completed
         db.update_project_status(project_id, 'completed', stage=7)
         
-        import base64
         return {
             'success': True,
             'project_id': project_id,
@@ -160,8 +148,7 @@ def process_assembly(project_id: str) -> Dict[str, Any]:
                     'brand_copy': True,
                     'banner': True
                 }
-            },
-            'zip_data': base64.b64encode(zip_data).decode('utf-8')
+            }
         }
         
     except Exception as e:
