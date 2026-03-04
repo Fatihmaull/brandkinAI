@@ -53,7 +53,7 @@ jobs:
           RDS_DATABASE: ${{ secrets.RDS_DATABASE }}
           RDS_USER: ${{ secrets.RDS_USER }}
           RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
-         run: |
+        run: |
           generate_function() {
             local svc_name=$1 fn_name=$2 desc=$3 handler=$4 mem=$5 timeout=$6 triggers=$7
             echo "  ${svc_name}:"
