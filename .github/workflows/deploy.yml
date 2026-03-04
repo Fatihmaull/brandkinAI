@@ -100,7 +100,7 @@ jobs:
             echo "name: brandkin-ai"
             echo "access: default"
             echo ""
-            echo "services:"
+            echo "resources:"
             generate_function "api-handler" "api-handler" "Main API Handler" "orchestrator.api_handler.handler" 512 60 "yes"
             generate_function "stage1-dna" "stage1-dna-handler" "Stage 1 - Brand DNA" "stage_handlers.stage1_dna.handler" 512 120 ""
             generate_function "stage2-visual" "stage2-visual-handler" "Stage 2 - Visual Gen" "stage_handlers.stage2_visual.handler" 1024 300 ""
