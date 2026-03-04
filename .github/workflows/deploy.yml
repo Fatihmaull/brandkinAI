@@ -153,14 +153,33 @@ jobs:
           BUILD_DIR="out"
           if [ ! -d "$BUILD_DIR" ]; then BUILD_DIR="dist"; fi
           echo "Deploying $BUILD_DIR to oss://$OSS_BUCKET/"
+
+          # Upload HTML files with correct Content-Type
+          ossutil cp -r -f "$BUILD_DIR/" "oss://$OSS_BUCKET/" --include "*.html" --meta "Content-Type:text/html; charset=utf-8" || true
+
+          # Upload JS files
+          ossutil cp -r -f "$BUILD_DIR/" "oss://$OSS_BUCKET/" --include "*.js" --meta "Content-Type:application/javascript" || true
+
+          # Upload CSS files
+          ossutil cp -r -f "$BUILD_DIR/" "oss://$OSS_BUCKET/" --include "*.css" --meta "Content-Type:text/css" || true
+
+          # Upload JSON files
+          ossutil cp -r -f "$BUILD_DIR/" "oss://$OSS_BUCKET/" --include "*.json" --meta "Content-Type:application/json" || true
+
+          # Upload images
+          ossutil cp -r -f "$BUILD_DIR/" "oss://$OSS_BUCKET/" --include "*.png" --meta "Content-Type:image/png" || true
+          ossutil cp -r -f "$BUILD_DIR/" "oss://$OSS_BUCKET/" --include "*.svg" --meta "Content-Type:image/svg+xml" || true
+          ossutil cp -r -f "$BUILD_DIR/" "oss://$OSS_BUCKET/" --include "*.ico" --meta "Content-Type:image/x-icon" || true
+
+          # Upload everything else (catch remaining files)
           ossutil cp -r -f "$BUILD_DIR/" "oss://$OSS_BUCKET/"
 
-      - name: Configure OSS Cache Headers
+      - name: Fix HTML Content-Type Headers
         env:
           OSS_BUCKET: ${{ secrets.OSS_FRONTEND_BUCKET }}
         run: |
+          ossutil set-meta "oss://$OSS_BUCKET/" "Content-Type:text/html; charset=utf-8" --include "*.html" --update -r || true
           ossutil set-meta "oss://$OSS_BUCKET/_next/static/" "Cache-Control:public,max-age=31536000,immutable" --update -r || true
-          ossutil set-meta "oss://$OSS_BUCKET/" "Content-Type:text/html" --include "*.html" --update -r || true
 
       - name: Set Bucket ACL to Public Read
         env:
