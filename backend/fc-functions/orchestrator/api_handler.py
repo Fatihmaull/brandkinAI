@@ -52,7 +52,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     headers = {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': CORS_ORIGINS,
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-App-Key, X-Timestamp, X-Nonce, X-Signature'
     }
     
@@ -71,8 +71,16 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'body': json.dumps({'status': 'ok', 'service': 'BrandKin AI'})
             }
         
+        # Helper to ensure CORS headers are on sub-handler responses
+        def _with_cors(response):
+            if isinstance(response, dict):
+                response_headers = response.get('headers', {})
+                response_headers.update(headers)
+                response['headers'] = response_headers
+            return response
+        
         if route == 'create_project':
-            return stage0_init.handler(event, context)
+            return _with_cors(stage0_init.handler(event, context))
         
         if route == 'get_project':
             project_id = path_params.get('id') or _extract_project_id(path)
@@ -90,13 +98,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 return get_code_exports(project_id, headers)
         
         if route == 'select_character':
-            return stage3_selection.handler(event, context)
+            return _with_cors(stage3_selection.handler(event, context))
         
         if route == 'revise':
-            return stage6_revision.handler(event, context)
+            return _with_cors(stage6_revision.handler(event, context))
         
         if route == 'finalize':
-            return stage7_assembly.handler(event, context)
+            return _with_cors(stage7_assembly.handler(event, context))
         
         # 404 for unmatched routes
         return {
