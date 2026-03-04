@@ -54,6 +54,16 @@ jobs:
           RDS_USER: ${{ secrets.RDS_USER }}
           RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
         run: |
+          # Install dependencies into the fc-functions directory
+          echo "Installing Python dependencies..."
+          cat << 'EOF' > fc-functions/requirements.txt
+          pymysql==1.1.0
+          requests==2.31.0
+          aliyun-python-sdk-core==2.15.1
+          aliyun-python-sdk-mns==1.1.8
+          EOF
+          pip install -r fc-functions/requirements.txt -t fc-functions/
+          
           generate_function() {
             local svc_name=$1 fn_name=$2 desc=$3 handler=$4 mem=$5 timeout=$6 triggers=$7
             echo "  ${svc_name}:"
