@@ -42,6 +42,103 @@ jobs:
 
       - name: Deploy to Function Compute
         working-directory: backend
+        run: |
+          # Generate s.yaml with actual values (bypass broken ${env.VAR})
+          cat > s.yaml << 'YAMLEOF'
+          edition: 3.0.0
+          name: brandkin-ai
+          access: default
+
+          services:
+            api-handler:
+              component: fc3
+              props:
+                region: ap-southeast-1
+                functionName: api-handler
+                description: Main API Handler for BrandKin AI
+                runtime: python3.10
+                handler: orchestrator.api_handler.handler
+                memorySize: 512
+                timeout: 60
+                code: ./fc-functions
+                environmentVariables:
+                  PYTHONPATH: /code
+          YAMLEOF
+
+          # Now use sed to inject secret values into environmentVariables
+          # Write a simpler s.yaml using Python for proper YAML formatting
+          python3 -c "
+          import yaml, os
+
+          config = {
+            'edition': '3.0.0',
+            'name': 'brandkin-ai',
+            'access': 'default',
+            'services': {}
+          }
+
+          env_vars = {
+            'PYTHONPATH': '/code',
+            'MODELSTUDIO_API_KEY': os.environ.get('MODELSTUDIO_API_KEY', ''),
+            'OSS_BUCKET': os.environ.get('OSS_BUCKET', ''),
+            'OSS_ENDPOINT': os.environ.get('OSS_ENDPOINT', ''),
+            'OSS_ACCESS_KEY_ID': os.environ.get('OSS_ACCESS_KEY_ID', ''),
+            'OSS_ACCESS_KEY_SECRET': os.environ.get('OSS_ACCESS_KEY_SECRET', ''),
+            'RDS_HOST': os.environ.get('RDS_HOST', ''),
+            'RDS_PORT': os.environ.get('RDS_PORT', '3106'),
+            'RDS_DATABASE': os.environ.get('RDS_DATABASE', ''),
+            'RDS_USER': os.environ.get('RDS_USER', ''),
+            'RDS_PASSWORD': os.environ.get('RDS_PASSWORD', ''),
+            'CORS_ALLOWED_ORIGINS': '*'
+          }
+
+          functions = [
+            ('api-handler', 'api-handler', 'Main API Handler', 'orchestrator.api_handler.handler', 512, 60),
+            ('stage1-dna', 'stage1-dna-handler', 'Stage 1 - Brand DNA', 'stage_handlers.stage1_dna.handler', 512, 120),
+            ('stage2-visual', 'stage2-visual-handler', 'Stage 2 - Visual Gen', 'stage_handlers.stage2_visual.handler', 1024, 300),
+            ('stage4-poses', 'stage4-poses-handler', 'Stage 4 - Pose Pack', 'stage_handlers.stage4_poses.handler', 1024, 600),
+            ('stage5-code', 'stage5-code-handler', 'Stage 5 - Code Export', 'stage_handlers.stage5_code.handler', 512, 120),
+            ('stage7-assembly', 'stage7-assembly-handler', 'Stage 7 - Assembly', 'stage_handlers.stage7_assembly.handler', 1024, 300),
+          ]
+
+          for svc_name, fn_name, desc, handler, mem, timeout in functions:
+            trigger_config = None
+            if svc_name == 'api-handler':
+              trigger_config = [{
+                'triggerName': 'httpTrigger',
+                'triggerType': 'http',
+                'triggerConfig': {
+                  'authType': 'anonymous',
+                  'methods': ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+                }
+              }]
+
+            props = {
+              'region': 'ap-southeast-1',
+              'functionName': fn_name,
+              'description': desc,
+              'runtime': 'python3.10',
+              'handler': handler,
+              'memorySize': mem,
+              'timeout': timeout,
+              'code': './fc-functions',
+              'environmentVariables': env_vars,
+            }
+            if trigger_config:
+              props['triggers'] = trigger_config
+
+            config['services'][svc_name] = {
+              'component': 'fc3',
+              'props': props
+            }
+
+          with open('s.yaml', 'w') as f:
+            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+          print('Generated s.yaml successfully')
+          "
+
+          cat s.yaml
+          s deploy -y
         env:
           MODELSTUDIO_API_KEY: ${{ secrets.MODELSTUDIO_API_KEY }}
           OSS_BUCKET: ${{ secrets.OSS_FRONTEND_BUCKET }}
@@ -53,8 +150,6 @@ jobs:
           RDS_DATABASE: ${{ secrets.RDS_DATABASE }}
           RDS_USER: ${{ secrets.RDS_USER }}
           RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
-          CORS_ALLOWED_ORIGINS: "*"
-        run: s deploy -y
 
   deploy-frontend:
     name: Deploy Frontend to OSS
