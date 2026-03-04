@@ -49,7 +49,7 @@ jobs:
           echo "OSS_ACCESS_KEY_ID=${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_ID }}" >> .env
           echo "OSS_ACCESS_KEY_SECRET=${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_SECRET }}" >> .env
           echo "RDS_HOST=${{ secrets.RDS_HOST }}" >> .env
-          echo "RDS_PORT=3306" >> .env
+          echo "RDS_PORT=3106" >> .env
           echo "RDS_DATABASE=${{ secrets.RDS_DATABASE }}" >> .env
           echo "RDS_USER=${{ secrets.RDS_USER }}" >> .env
           echo "RDS_PASSWORD=${{ secrets.RDS_PASSWORD }}" >> .env
