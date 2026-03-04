@@ -161,3 +161,10 @@ jobs:
         run: |
           ossutil set-meta "oss://$OSS_BUCKET/_next/static/" "Cache-Control:public,max-age=31536000,immutable" --update -r || true
           ossutil set-meta "oss://$OSS_BUCKET/" "Content-Type:text/html" --include "*.html" --update -r || true
+
+      - name: Set Bucket ACL to Public Read
+        env:
+          OSS_BUCKET: ${{ secrets.OSS_FRONTEND_BUCKET }}
+        run: |
+          ossutil bucket-acl "oss://$OSS_BUCKET" public-read || ossutil set-acl "oss://$OSS_BUCKET" public-read -b || true
+          echo "Bucket ACL set to public-read"
