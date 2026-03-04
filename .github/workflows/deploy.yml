@@ -60,7 +60,6 @@ jobs:
           pymysql==1.1.0
           requests==2.31.0
           aliyun-python-sdk-core==2.15.1
-          aliyun-python-sdk-mns==1.1.8
           EOF
           pip install -r fc-functions/requirements.txt -t fc-functions/
           
