@@ -3,7 +3,8 @@
  * Handles communication with backend API
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+// FORCE override any ghost bindings from Vercel
+const API_BASE_URL = '';
 
 interface ApiResponse<T> {
   data?: T;
@@ -18,11 +19,9 @@ async function apiRequest<T>(
   endpoint: string,
   body?: object
 ): Promise<ApiResponse<T>> {
-  // If API_BASE_URL is set (e.g., local dev), use it. Otherwise, use relative path for Vercel proxy.
-  // Ensure we don't end up with //api/v1/projects
-  const baseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+  // Hardcode the relative path to force going through Vercel's proxy
   const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const url = `${baseUrl}${path}`;
+  const url = `${API_BASE_URL}${path}`;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
