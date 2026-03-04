@@ -1,0 +1,166 @@
+edition: 3.0.0
+name: brandkin-ai
+access: default
+
+vars:
+  region: ap-southeast-1
+  service:
+    name: brandkin-ai-service
+    description: BrandKin AI Service
+
+services:
+  api-handler:
+    component: fc3
+    props:
+      region: ${vars.region}
+      functionName: api-handler
+      description: Main API Handler for BrandKin AI
+      runtime: python3.10
+      handler: orchestrator.api_handler.handler
+      memorySize: 512
+      timeout: 60
+      code: ./fc-functions
+      environmentVariables:
+        PYTHONPATH: /code
+        MODELSTUDIO_API_KEY: ${env.MODELSTUDIO_API_KEY}
+        OSS_BUCKET: ${env.OSS_BUCKET}
+        OSS_ENDPOINT: ${env.OSS_ENDPOINT}
+        OSS_ACCESS_KEY_ID: ${env.OSS_ACCESS_KEY_ID}
+        OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}
+        RDS_HOST: ${env.RDS_HOST}
+        RDS_PORT: ${env.RDS_PORT}
+        RDS_DATABASE: ${env.RDS_DATABASE}
+        RDS_USER: ${env.RDS_USER}
+        RDS_PASSWORD: ${env.RDS_PASSWORD}
+        CORS_ALLOWED_ORIGINS: "*"
+      triggers:
+        - triggerName: httpTrigger
+          triggerType: http
+          triggerConfig:
+            authType: anonymous
+            methods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+
+  stage1-dna:
+    component: fc3
+    props:
+      region: ${vars.region}
+      functionName: stage1-dna-handler
+      description: Stage 1 - Brand DNA Analysis
+      runtime: python3.10
+      handler: stage_handlers.stage1_dna.handler
+      memorySize: 512
+      timeout: 120
+      code: ./fc-functions
+      environmentVariables:
+        PYTHONPATH: /code
+        MODELSTUDIO_API_KEY: ${env.MODELSTUDIO_API_KEY}
+        OSS_BUCKET: ${env.OSS_BUCKET}
+        OSS_ENDPOINT: ${env.OSS_ENDPOINT}
+        OSS_ACCESS_KEY_ID: ${env.OSS_ACCESS_KEY_ID}
+        OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}
+        RDS_HOST: ${env.RDS_HOST}
+        RDS_PORT: ${env.RDS_PORT}
+        RDS_DATABASE: ${env.RDS_DATABASE}
+        RDS_USER: ${env.RDS_USER}
+        RDS_PASSWORD: ${env.RDS_PASSWORD}
+
+  stage2-visual:
+    component: fc3
+    props:
+      region: ${vars.region}
+      functionName: stage2-visual-handler
+      description: Stage 2 - Visual Generation
+      runtime: python3.10
+      handler: stage_handlers.stage2_visual.handler
+      memorySize: 1024
+      timeout: 300
+      code: ./fc-functions
+      environmentVariables:
+        PYTHONPATH: /code
+        MODELSTUDIO_API_KEY: ${env.MODELSTUDIO_API_KEY}
+        OSS_BUCKET: ${env.OSS_BUCKET}
+        OSS_ENDPOINT: ${env.OSS_ENDPOINT}
+        OSS_ACCESS_KEY_ID: ${env.OSS_ACCESS_KEY_ID}
+        OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}
+        RDS_HOST: ${env.RDS_HOST}
+        RDS_PORT: ${env.RDS_PORT}
+        RDS_DATABASE: ${env.RDS_DATABASE}
+        RDS_USER: ${env.RDS_USER}
+        RDS_PASSWORD: ${env.RDS_PASSWORD}
+
+  stage4-poses:
+    component: fc3
+    props:
+      region: ${vars.region}
+      functionName: stage4-poses-handler
+      description: Stage 4 - Pose Pack Generation
+      runtime: python3.10
+      handler: stage_handlers.stage4_poses.handler
+      memorySize: 1024
+      timeout: 600
+      code: ./fc-functions
+      environmentVariables:
+        PYTHONPATH: /code
+        MODELSTUDIO_API_KEY: ${env.MODELSTUDIO_API_KEY}
+        OSS_BUCKET: ${env.OSS_BUCKET}
+        OSS_ENDPOINT: ${env.OSS_ENDPOINT}
+        OSS_ACCESS_KEY_ID: ${env.OSS_ACCESS_KEY_ID}
+        OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}
+        RDS_HOST: ${env.RDS_HOST}
+        RDS_PORT: ${env.RDS_PORT}
+        RDS_DATABASE: ${env.RDS_DATABASE}
+        RDS_USER: ${env.RDS_USER}
+        RDS_PASSWORD: ${env.RDS_PASSWORD}
+
+  stage5-code:
+    component: fc3
+    props:
+      region: ${vars.region}
+      functionName: stage5-code-handler
+      description: Stage 5 - Code Export
+      runtime: python3.10
+      handler: stage_handlers.stage5_code.handler
+      memorySize: 512
+      timeout: 120
+      code: ./fc-functions
+      environmentVariables:
+        PYTHONPATH: /code
+        MODELSTUDIO_API_KEY: ${env.MODELSTUDIO_API_KEY}
+        OSS_BUCKET: ${env.OSS_BUCKET}
+        OSS_ENDPOINT: ${env.OSS_ENDPOINT}
+        OSS_ACCESS_KEY_ID: ${env.OSS_ACCESS_KEY_ID}
+        OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}
+        RDS_HOST: ${env.RDS_HOST}
+        RDS_PORT: ${env.RDS_PORT}
+        RDS_DATABASE: ${env.RDS_DATABASE}
+        RDS_USER: ${env.RDS_USER}
+        RDS_PASSWORD: ${env.RDS_PASSWORD}
+
+  stage7-assembly:
+    component: fc3
+    props:
+      region: ${vars.region}
+      functionName: stage7-assembly-handler
+      description: Stage 7 - Brand Kit Assembly
+      runtime: python3.10
+      handler: stage_handlers.stage7_assembly.handler
+      memorySize: 1024
+      timeout: 300
+      code: ./fc-functions
+      environmentVariables:
+        PYTHONPATH: /code
+        MODELSTUDIO_API_KEY: ${env.MODELSTUDIO_API_KEY}
+        OSS_BUCKET: ${env.OSS_BUCKET}
+        OSS_ENDPOINT: ${env.OSS_ENDPOINT}
+        OSS_ACCESS_KEY_ID: ${env.OSS_ACCESS_KEY_ID}
+        OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}
+        RDS_HOST: ${env.RDS_HOST}
+        RDS_PORT: ${env.RDS_PORT}
+        RDS_DATABASE: ${env.RDS_DATABASE}
+        RDS_USER: ${env.RDS_USER}
+        RDS_PASSWORD: ${env.RDS_PASSWORD}

@@ -5,6 +5,10 @@ on:
     branches:
       - master
       - main
+  workflow_dispatch:
+
+env:
+  OSS_REGION: ap-southeast-1
 
 jobs:
   deploy-backend:
@@ -24,7 +28,7 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install Dependencies
+      - name: Install Python Dependencies
         run: |
           cd backend
           pip install -r requirements.txt
@@ -35,11 +39,28 @@ jobs:
       - name: Configure Alibaba Cloud Credentials
         run: |
           s config add --AccessKeyID ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_ID }} --AccessKeySecret ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_SECRET }} --AccountID ${{ secrets.ALIBABA_CLOUD_ACCOUNT_ID }} -a default -f
-        
+
+      - name: Create Backend .env for FC Deployment
+        run: |
+          cd backend
+          cat > .env << 'ENVEOF'
+          MODELSTUDIO_API_KEY=${{ secrets.MODELSTUDIO_API_KEY }}
+          OSS_BUCKET=${{ secrets.OSS_FRONTEND_BUCKET }}
+          OSS_ENDPOINT=oss-${{ env.OSS_REGION }}.aliyuncs.com
+          OSS_ACCESS_KEY_ID=${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_ID }}
+          OSS_ACCESS_KEY_SECRET=${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_SECRET }}
+          RDS_HOST=${{ secrets.RDS_HOST }}
+          RDS_PORT=3306
+          RDS_DATABASE=${{ secrets.RDS_DATABASE }}
+          RDS_USER=${{ secrets.RDS_USER }}
+          RDS_PASSWORD=${{ secrets.RDS_PASSWORD }}
+          CORS_ALLOWED_ORIGINS=*
+          ENVEOF
+
       - name: Deploy to Function Compute
         run: |
           cd backend
-          s deploy -y --use-local
+          s deploy -y
 
   deploy-frontend:
     name: Deploy Frontend to OSS
@@ -66,28 +87,26 @@ jobs:
           npm run build
 
       - name: Setup Alibaba Cloud OSSUTIL
-        uses: manyuanrong/setup-ossutil@v2.0
+        uses: manyuanrong/setup-ossutil@v3.0
         with:
-          endpoint: "oss-cn-hangzhou.aliyuncs.com"
+          endpoint: "oss-${{ env.OSS_REGION }}.aliyuncs.com"
           access-key-id: ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_ID }}
           access-key-secret: ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_SECRET }}
 
       - name: Sync Static Export to OSS Bucket
         env:
-          OSS_BUCKET: ${{ secrets.OSS_FRONTEND_BUCKET || 'brandkin-ai-frontend' }}
+          OSS_BUCKET: ${{ secrets.OSS_FRONTEND_BUCKET }}
         run: |
           cd frontend/nextjs-app
-          # Default Next.js static export directory is 'out' instead of 'dist' in modern Next.js
-          # Will sync 'out' folder or 'dist' based on what exists
           BUILD_DIR="out"
           if [ ! -d "$BUILD_DIR" ]; then BUILD_DIR="dist"; fi
-          
+
           echo "Deploying $BUILD_DIR to oss://$OSS_BUCKET/"
           ossutil cp -r -f "$BUILD_DIR/" "oss://$OSS_BUCKET/"
-          
-      - name: Configure OSS Headers
+
+      - name: Configure OSS Cache Headers
         env:
-          OSS_BUCKET: ${{ secrets.OSS_FRONTEND_BUCKET || 'brandkin-ai-frontend' }}
+          OSS_BUCKET: ${{ secrets.OSS_FRONTEND_BUCKET }}
         run: |
-          ossutil set-meta "oss://$OSS_BUCKET/_next/static/" "Cache-Control:public,max-age=31536000,immutable" --update -r
-          ossutil set-meta "oss://$OSS_BUCKET/" "Content-Type:text/html" --include "*.html" --update -r
+          ossutil set-meta "oss://$OSS_BUCKET/_next/static/" "Cache-Control:public,max-age=31536000,immutable" --update -r || true
+          ossutil set-meta "oss://$OSS_BUCKET/" "Content-Type:text/html" --include "*.html" --update -r || true
