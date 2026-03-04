@@ -119,6 +119,9 @@ def process_stage5(project_id: str, selected_asset: Dict, brand_dna: Dict) -> Di
             'component_name': component_data.get('component_name')
         })
         
+        # Mark as ready for finalization
+        db.update_project_status(project_id, 'awaiting_finalization', stage=5)
+        
         return {
             'success': True,
             'project_id': project_id,

@@ -8,7 +8,7 @@ import { api } from '@/lib/api';
 
 interface Asset {
   asset_id: string;
-  asset_type: string;
+  type: string;
   oss_url: string;
   transparent_url: string;
   is_selected: boolean;
@@ -40,7 +40,7 @@ function LoadingState() {
 function AssetsContent() {
   const searchParams = useSearchParams();
   const projectId = searchParams.get('id');
-  
+
   const [project, setProject] = useState<Project | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -59,7 +59,7 @@ function AssetsContent() {
         api.getProject(id),
         api.getAssets(id)
       ]);
-      
+
       if (projectRes.data) {
         setProject(projectRes.data as Project);
       }
@@ -77,9 +77,9 @@ function AssetsContent() {
     }
   };
 
-  const mascots = assets.filter(a => a.asset_type === 'mascot');
-  const avatars = assets.filter(a => a.asset_type === 'avatar');
-  const poses = assets.filter(a => a.asset_type === 'pose');
+  const mascots = assets.filter(a => a.type === 'mascot');
+  const avatars = assets.filter(a => a.type === 'avatar');
+  const poses = assets.filter(a => a.type === 'pose');
 
   const handleDownload = (url: string, filename: string) => {
     const link = document.createElement('a');
@@ -118,21 +118,21 @@ function AssetsContent() {
       <div className="aspect-square relative bg-[#0d0d0d]">
         <img
           src={asset.transparent_url || asset.oss_url}
-          alt={asset.metadata?.pose_name || asset.asset_type}
+          alt={asset.metadata?.pose_name || asset.type}
           className="w-full h-full object-contain p-4"
         />
-        
+
         {/* Selected Badge */}
         {asset.is_selected && (
           <div className="absolute top-2 right-2 w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center">
             <Check className="w-4 h-4 text-white" />
           </div>
         )}
-        
+
         {/* Hover Overlay */}
         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
           <button
-            onClick={() => handleDownload(asset.oss_url, `${asset.asset_type}_${asset.asset_id}.png`)}
+            onClick={() => handleDownload(asset.oss_url, `${asset.type}_${asset.asset_id}.png`)}
             className="p-2 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-colors"
             title="Download"
           >
@@ -144,7 +144,7 @@ function AssetsContent() {
       {/* Info */}
       <div className="p-3 border-t border-[#3c3c43]">
         <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-400 capitalize">{asset.asset_type}</span>
+          <span className="text-sm text-gray-400 capitalize">{asset.type}</span>
           {asset.is_selected && (
             <span className="text-xs text-blue-400">Selected</span>
           )}
@@ -172,13 +172,13 @@ function AssetsContent() {
               </div>
             </div>
             <div className="flex gap-3">
-              <Link 
+              <Link
                 href={`/brand?id=${projectId}`}
                 className="studio-btn-secondary text-sm"
               >
                 View Brand
               </Link>
-              <Link 
+              <Link
                 href={`/components-page?id=${projectId}`}
                 className="studio-btn-secondary text-sm"
               >

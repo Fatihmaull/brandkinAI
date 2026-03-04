@@ -8,6 +8,7 @@ import StageTracker from '@/components/StageTracker';
 import AssetGallery from '@/components/AssetGallery';
 import CodePreview from '@/components/CodePreview';
 import CharacterSelection from '@/components/CharacterSelection';
+import GenerationProgress from '@/components/GenerationProgress';
 import { api } from '@/lib/api';
 
 export default function Home() {
@@ -48,7 +49,7 @@ export default function Home() {
 
         if (projectData.status === 'processing') {
           setLoadingMessage(`Creating ${getStageName(projectData.current_stage)}...`);
-        } else if (projectData.status === 'awaiting_selection') {
+        } else if (projectData.status === 'awaiting_selection' || projectData.status === 'awaiting_finalization') {
           setIsLoading(false);
           setLoadingMessage('');
         }
@@ -94,10 +95,14 @@ export default function Home() {
   const handleCharacterSelect = async (assetId: string, type: string) => {
     if (!projectId) return;
 
+    // Optimistically show processing state
+    setProjectStatus('processing');
+
     const { data, error } = await api.selectCharacter(projectId, assetId, type);
 
     if (error) {
       alert(`Failed to select character: ${error}`);
+      setProjectStatus('awaiting_selection'); // Revert on error
       return;
     }
 
@@ -105,57 +110,47 @@ export default function Home() {
     if (assetsData) {
       setAssets((assetsData as any).assets || []);
     }
+
+    // Fetch code exports too since Stage 5 generates them synchronously
+    const { data: codeData } = await api.getCodeExports(projectId);
+    if (codeData) {
+      setCodeExports((codeData as any).code_exports || []);
+    }
+
+    // Explicitly update status to turn off progress bar
+    setProjectStatus('awaiting_finalization');
   };
 
   const handleRevision = async (assetId: string, feedback: string, type: string) => {
     if (!projectId) return;
 
-    setIsLoading(true);
-    setLoadingMessage(`Revising ${type}... This may take 20-30 seconds`);
+    const { data, error } = await api.requestRevision(projectId, assetId, feedback, type);
 
-    try {
-      const { data, error } = await api.requestRevision(projectId, assetId, feedback, type);
+    if (error) {
+      alert(`Failed to request revision: ${error}`);
+      return;
+    }
 
-      if (error) {
-        alert(`Failed to request revision: ${error}`);
-        setIsLoading(false);
-        setLoadingMessage('');
-        return;
-      }
-
-      // Refresh assets after successful revision
+    setTimeout(async () => {
       const { data: assetsData } = await api.getAssets(projectId);
       if (assetsData) {
         setAssets((assetsData as any).assets || []);
       }
-    } catch (err) {
-      console.error('Revision error:', err);
-    } finally {
-      setIsLoading(false);
-      setLoadingMessage('');
-    }
+    }, 5000);
   };
 
   const handleFinalize = async () => {
     if (!projectId) return;
 
-    setIsLoading(true);
-    setLoadingMessage('Generating brand kit... This may take a minute');
+    const { data, error } = await api.finalizeProject(projectId);
 
-    try {
-      const { data, error } = await api.finalizeProject(projectId);
+    if (error) {
+      alert(`Failed to finalize: ${error}`);
+      return;
+    }
 
-      if (error) {
-        alert(`Failed to finalize: ${error}`);
-        return;
-      }
-
-      if (data && (data as any).brand_kit) {
-        setBrandKit((data as any).brand_kit);
-      }
-    } finally {
-      setIsLoading(false);
-      setLoadingMessage('');
+    if (data && (data as any).brand_kit) {
+      setBrandKit((data as any).brand_kit);
     }
   };
 
@@ -292,51 +287,9 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Loading Overlay */}
-              {isLoading && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-                  <div className="studio-card p-10 max-w-md w-full mx-4 text-center relative overflow-hidden">
-                    {/* Animated glow border */}
-                    <div className="absolute inset-0 rounded-2xl">
-                      <div className="absolute inset-[-2px] rounded-2xl bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 opacity-30 animate-pulse" />
-                    </div>
-
-                    {/* Animated rings */}
-                    <div className="relative mb-6">
-                      <div className="w-20 h-20 mx-auto relative">
-                        <div className="absolute inset-0 rounded-full border-4 border-blue-500/20" />
-                        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-500 animate-spin" />
-                        <div className="absolute inset-2 rounded-full border-4 border-transparent border-t-purple-500 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
-                        <div className="absolute inset-4 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center">
-                          <Sparkles className="w-5 h-5 text-blue-400 animate-pulse" />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Message */}
-                    <p className="text-lg font-medium text-white mb-2 relative z-10">{loadingMessage}</p>
-                    <p className="text-sm text-gray-400 relative z-10">AI is working its magic...</p>
-
-                    {/* Progress bar */}
-                    <div className="mt-6 h-1.5 bg-[#1c1c1e] rounded-full overflow-hidden relative z-10">
-                      <div className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-loading-bar" />
-                    </div>
-
-                    <style jsx>{`
-                      @keyframes loading-bar {
-                        0% { width: 0%; }
-                        20% { width: 25%; }
-                        50% { width: 50%; }
-                        80% { width: 75%; }
-                        95% { width: 90%; }
-                        100% { width: 95%; }
-                      }
-                      .animate-loading-bar {
-                        animation: loading-bar 30s ease-out forwards;
-                      }
-                    `}</style>
-                  </div>
-                </div>
+              {/* Loading State & Progress (shown above contents) */}
+              {(isLoading || projectStatus === 'processing') && (
+                <GenerationProgress currentStage={currentStage} status={projectStatus} />
               )}
 
               {/* Character Selection - Stage 2 */}
