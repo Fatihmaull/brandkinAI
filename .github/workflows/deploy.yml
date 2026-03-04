@@ -41,26 +41,24 @@ jobs:
           s config add --AccessKeyID ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_ID }} --AccessKeySecret ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_SECRET }} --AccountID ${{ secrets.ALIBABA_CLOUD_ACCOUNT_ID }} -a default -f
 
       - name: Create Backend .env for FC Deployment
+        working-directory: backend
         run: |
-          cd backend
-          cat > .env << 'ENVEOF'
-          MODELSTUDIO_API_KEY=${{ secrets.MODELSTUDIO_API_KEY }}
-          OSS_BUCKET=${{ secrets.OSS_FRONTEND_BUCKET }}
-          OSS_ENDPOINT=oss-${{ env.OSS_REGION }}.aliyuncs.com
-          OSS_ACCESS_KEY_ID=${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_ID }}
-          OSS_ACCESS_KEY_SECRET=${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_SECRET }}
-          RDS_HOST=${{ secrets.RDS_HOST }}
-          RDS_PORT=3306
-          RDS_DATABASE=${{ secrets.RDS_DATABASE }}
-          RDS_USER=${{ secrets.RDS_USER }}
-          RDS_PASSWORD=${{ secrets.RDS_PASSWORD }}
-          CORS_ALLOWED_ORIGINS=*
-          ENVEOF
+          echo "MODELSTUDIO_API_KEY=${{ secrets.MODELSTUDIO_API_KEY }}" > .env
+          echo "OSS_BUCKET=${{ secrets.OSS_FRONTEND_BUCKET }}" >> .env
+          echo "OSS_ENDPOINT=oss-${{ env.OSS_REGION }}.aliyuncs.com" >> .env
+          echo "OSS_ACCESS_KEY_ID=${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_ID }}" >> .env
+          echo "OSS_ACCESS_KEY_SECRET=${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_SECRET }}" >> .env
+          echo "RDS_HOST=${{ secrets.RDS_HOST }}" >> .env
+          echo "RDS_PORT=3306" >> .env
+          echo "RDS_DATABASE=${{ secrets.RDS_DATABASE }}" >> .env
+          echo "RDS_USER=${{ secrets.RDS_USER }}" >> .env
+          echo "RDS_PASSWORD=${{ secrets.RDS_PASSWORD }}" >> .env
+          echo "CORS_ALLOWED_ORIGINS=*" >> .env
+          cat .env
 
       - name: Deploy to Function Compute
-        run: |
-          cd backend
-          s deploy -y
+        working-directory: backend
+        run: s deploy -y
 
   deploy-frontend:
     name: Deploy Frontend to OSS
@@ -100,7 +98,6 @@ jobs:
           cd frontend/nextjs-app
           BUILD_DIR="out"
           if [ ! -d "$BUILD_DIR" ]; then BUILD_DIR="dist"; fi
-
           echo "Deploying $BUILD_DIR to oss://$OSS_BUCKET/"
           ossutil cp -r -f "$BUILD_DIR/" "oss://$OSS_BUCKET/"
 
