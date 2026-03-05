@@ -40,5 +40,5 @@ fc-functions/*
 !fc-functions/stage_handlers/
 !fc-functions/utils/
 !fc-functions/prompts/
-!fc-functions/*.py
+!fc-functions/__init__.py
 !fc-functions/requirements.txt
