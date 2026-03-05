@@ -27,11 +27,23 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         Response with project_id and initial status
     """
     try:
+        # Defensive parsing: FC 3.0 may pass event as bytes, string, or dict
+        if isinstance(event, (bytes, bytearray)):
+            event = json.loads(event.decode('utf-8'))
+        elif isinstance(event, str):
+            event = json.loads(event)
+        
         # Parse request body
-        if isinstance(event.get('body'), str):
-            body = json.loads(event['body'])
+        body_raw = event.get('body', '{}')
+        if isinstance(body_raw, str):
+            body = json.loads(body_raw) if body_raw else {}
+        elif isinstance(body_raw, (bytes, bytearray)):
+            body = json.loads(body_raw.decode('utf-8')) if body_raw else {}
+        elif isinstance(body_raw, dict):
+            body = body_raw
         else:
-            body = event.get('body', {})
+            body = {}
+
         
         brand_brief = body.get('brand_brief')
         
