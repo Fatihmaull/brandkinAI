@@ -3,10 +3,10 @@
 aliyun-python-sdk-core>=2.13.0
 aliyun-python-sdk-sts>=3.0.0
 oss2>=2.18.0
-pymysql>=1.1.0
+pymysql==1.0.3
 
 # HTTP Client
-requests>=2.31.0
+requests==2.31.0
 
 # Utilities
 python-json-logger>=2.0.0
