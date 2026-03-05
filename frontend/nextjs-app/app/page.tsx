@@ -142,16 +142,27 @@ export default function Home() {
   const handleFinalize = async () => {
     if (!projectId) return;
 
+    // Show processing feedback immediately
+    setIsLoading(true);
+    setLoadingMessage('Assembling your Brand Kit...');
+    setProjectStatus('processing');
+    setCurrentStage(7);
+
     const { data, error } = await api.finalizeProject(projectId);
 
     if (error) {
       alert(`Failed to finalize: ${error}`);
+      setIsLoading(false);
+      setProjectStatus('awaiting_finalization'); // Reset back to allow retry
       return;
     }
 
     if (data && (data as any).brand_kit) {
       setBrandKit((data as any).brand_kit);
+      setProjectStatus('completed');
     }
+
+    setIsLoading(false);
   };
 
   // Feature cards for the landing page

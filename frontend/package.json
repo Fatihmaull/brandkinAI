@@ -1,0 +1,14 @@
+{
+    "name": "brandkin-ai-frontend-proxy",
+    "version": "1.0.0",
+    "description": "Proxy for BrandKin AI Frontend commands",
+    "scripts": {
+        "install": "cd nextjs-app && npm install",
+        "dev": "cd nextjs-app && npm run dev",
+        "build": "cd nextjs-app && npm run build",
+        "start": "cd nextjs-app && npm run start"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC"
+}
