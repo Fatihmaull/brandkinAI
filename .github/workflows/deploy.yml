@@ -115,6 +115,10 @@ jobs:
           cat s.yaml
           echo "========================"
           s deploy -y
+          
+          echo "=== Fetching Function Logs to Catch Boot Crash ==="
+          s api-handler invoke -e "{}" || true
+          s api-handler logs || true
 
   deploy-frontend:
     name: Deploy Frontend to OSS
