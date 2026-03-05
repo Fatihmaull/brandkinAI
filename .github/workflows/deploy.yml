@@ -54,8 +54,9 @@ jobs:
           RDS_USER: ${{ secrets.RDS_USER }}
           RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
         run: |
-          # Use the root backend directory for deployment
-          # FC 3.0 native build will automatically install requirements.txt on the server side
+          # Copy requirements.txt to the function directory so FC natively builds it
+          # This ensures binary compatibility with the Alibaba Cloud Python runtime
+          cp requirements.txt fc-functions/
           
           generate_function() {
             local svc_name=$1 fn_name=$2 desc=$3 handler=$4 mem=$5 timeout=$6 triggers=$7
@@ -69,7 +70,7 @@ jobs:
             echo "      handler: ${handler}"
             echo "      memorySize: ${mem}"
             echo "      timeout: ${timeout}"
-            echo "      code: ."
+            echo "      code: ./fc-functions"
             echo "      environmentVariables:"
             echo "        MODELSTUDIO_API_KEY: '${MODELSTUDIO_API_KEY}'"
             echo "        OSS_BUCKET: '${OSS_BUCKET}'"
