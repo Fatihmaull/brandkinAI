@@ -61,7 +61,7 @@ jobs:
           requests>=2.28.0,<3.0.0
           aliyun-python-sdk-core==2.15.1
           EOF
-          pip install -r fc-functions/requirements.txt -t fc-functions/
+          pip install -r fc-functions/requirements.txt -t fc-functions/ --platform manylinux2014_x86_64 --python-version 310 --only-binary=:all:
           
           generate_function() {
             local svc_name=$1 fn_name=$2 desc=$3 handler=$4 mem=$5 timeout=$6 triggers=$7
