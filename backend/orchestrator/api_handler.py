@@ -198,127 +198,74 @@ def _original_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
 def handler(environ_or_event, context_or_start_response):
     """
-    Universal FC 3.0 Handler.
-    
-    FC 3.0 HTTP Triggers with Python can invoke in MULTIPLE formats:
-    1. WSGI: (environ_dict, start_response_callable)  
-    2. Raw HTTP: (request_bytes, fc_context_object)
-    3. Event dict: (event_dict, fc_context_object)
-    
-    This handler auto-detects the format and normalizes it.
+    DIAGNOSTIC HANDLER - Temporarily dumps all FC 3.0 runtime info
+    to discover where HTTP method, path, and headers are stored.
     """
-    import urllib.parse
+    import os
     
-    # === FORMAT 1: WSGI MODE ===
-    if callable(context_or_start_response):
-        environ = environ_or_event
-        start_response = context_or_start_response
-        
-        event = {
-            'httpMethod': environ.get('REQUEST_METHOD', 'GET'),
-            'path': environ.get('PATH_INFO', ''),
-            'pathParameters': {},
-            'queryStringParameters': {k: v[0] for k, v in urllib.parse.parse_qs(environ.get('QUERY_STRING', '')).items()},
-            'headers': {k[5:].replace('_', '-').lower(): v for k, v in environ.items() if k.startswith('HTTP_')},
-        }
-        
-        try:
-            size = int(environ.get('CONTENT_LENGTH', 0))
-            event['body'] = environ['wsgi.input'].read(size).decode('utf-8') if size > 0 else "{}"
-        except:
-            event['body'] = "{}"
-            
-        try:
-            result = _original_handler(event, environ.get('fc.context'))
-        except Exception as e:
-            import traceback
-            result = {
-                'statusCode': 500,
-                'headers': {'Access-Control-Allow-Origin': '*'},
-                'body': json.dumps({'error': 'Internal Crash', 'details': str(e), 'trace': traceback.format_exc()})
-            }
-        
-        status = f"{result.get('statusCode', 200)} Response"
-        if result.get('statusCode') == 200: status = "200 OK"
-            
-        resp_headers = [(str(k), str(v)) for k, v in result.get('headers', {}).items()]
-        if 'Content-Type' not in result.get('headers', {}):
-            resp_headers.append(('Content-Type', 'application/json'))
-            
-        start_response(status, resp_headers)
-        body = result.get('body', '')
-        if isinstance(body, dict): body = json.dumps(body)
-        return [body.encode('utf-8') if isinstance(body, str) else body]
+    # Collect diagnostic data
+    diag = {
+        'arg1_type': str(type(environ_or_event)),
+        'arg2_type': str(type(context_or_start_response)),
+        'arg2_callable': callable(context_or_start_response),
+    }
     
+    # Inspect arg1
+    if isinstance(environ_or_event, (bytes, bytearray)):
+        diag['arg1_preview'] = environ_or_event[:500].decode('utf-8', errors='replace')
+    elif isinstance(environ_or_event, dict):
+        diag['arg1_keys'] = list(environ_or_event.keys())[:30]
+        # Check for WSGI keys
+        for key in ['REQUEST_METHOD', 'PATH_INFO', 'QUERY_STRING', 'CONTENT_TYPE', 
+                     'CONTENT_LENGTH', 'SERVER_NAME', 'SERVER_PORT', 'wsgi.input',
+                     'fc.context', 'fc.request_uri', 'HTTP_HOST']:
+            if key in environ_or_event:
+                val = environ_or_event[key]
+                diag[f'arg1.{key}'] = str(val)[:200]
+    elif isinstance(environ_or_event, str):
+        diag['arg1_preview'] = environ_or_event[:500]
     else:
-        # === FORMAT 2 or 3: Raw bytes or Event dict ===
-        context = context_or_start_response
-        event = environ_or_event
-        
-        # If event is raw bytes, parse the HTTP request
-        if isinstance(event, (bytes, bytearray)):
-            try:
-                raw = event.decode('utf-8')
-                
-                # Try to parse as JSON directly (some FC versions send JSON bytes)
-                try:
-                    event = json.loads(raw)
-                except json.JSONDecodeError:
-                    # It's a raw HTTP request string, parse it manually
-                    # Format: "POST /path HTTP/1.1\r\nHeaders\r\n\r\nBody"
-                    parts = raw.split('\r\n\r\n', 1)
-                    header_section = parts[0]
-                    body_section = parts[1] if len(parts) > 1 else '{}'
-                    
-                    lines = header_section.split('\r\n')
-                    request_line = lines[0] if lines else 'GET / HTTP/1.1'
-                    method_path = request_line.split(' ')
-                    
-                    event = {
-                        'httpMethod': method_path[0] if len(method_path) > 0 else 'GET',
-                        'path': method_path[1] if len(method_path) > 1 else '/',
-                        'pathParameters': {},
-                        'queryStringParameters': {},
-                        'headers': {},
-                        'body': body_section
-                    }
-                    
-                    # Parse query string if present
-                    if '?' in event['path']:
-                        path_parts = event['path'].split('?', 1)
-                        event['path'] = path_parts[0]
-                        event['queryStringParameters'] = {k: v[0] for k, v in urllib.parse.parse_qs(path_parts[1]).items()}
-                    
-                    # Parse headers
-                    for line in lines[1:]:
-                        if ':' in line:
-                            key, value = line.split(':', 1)
-                            event['headers'][key.strip().lower()] = value.strip()
-                            
-            except Exception as e:
-                import traceback
-                return {
-                    'statusCode': 500,
-                    'headers': {'Access-Control-Allow-Origin': '*'},
-                    'body': json.dumps({
-                        'error': 'Failed to parse raw bytes event',
-                        'details': str(e),
-                        'raw_preview': repr(environ_or_event[:500]) if len(environ_or_event) > 0 else 'empty',
-                        'trace': traceback.format_exc()
-                    })
-                }
-        
-        # If event is a string, try to parse as JSON
-        elif isinstance(event, str):
-            try:
-                event = json.loads(event)
-            except json.JSONDecodeError:
-                event = {'httpMethod': 'GET', 'path': '/', 'body': event}
-        
-        # Now event should be a dict
-        try:
-            return _original_handler(event, context)
-        except Exception as e:
-            import traceback
-            return {'statusCode': 500, 'body': json.dumps({'error': str(e), 'trace': traceback.format_exc()})}
-
+        diag['arg1_repr'] = repr(environ_or_event)[:500]
+    
+    # Inspect arg2 (context or start_response)
+    try:
+        diag['arg2_dir'] = [x for x in dir(context_or_start_response) if not x.startswith('__')]
+    except:
+        diag['arg2_dir'] = 'failed'
+    
+    try:
+        if hasattr(context_or_start_response, 'request_id'):
+            diag['arg2.request_id'] = str(context_or_start_response.request_id)
+        if hasattr(context_or_start_response, 'function'):
+            diag['arg2.function'] = str(context_or_start_response.function)
+        if hasattr(context_or_start_response, 'http_params'):
+            diag['arg2.http_params'] = str(context_or_start_response.http_params)
+        if hasattr(context_or_start_response, 'service'):
+            diag['arg2.service'] = str(context_or_start_response.service)
+        if hasattr(context_or_start_response, 'credentials'):
+            diag['arg2.credentials'] = 'present (hidden)'
+    except Exception as e:
+        diag['arg2_inspect_error'] = str(e)
+    
+    # Inspect environment variables (FC-related)
+    fc_env = {}
+    for k, v in os.environ.items():
+        if any(prefix in k.upper() for prefix in ['FC_', 'HTTP_', 'REQUEST', 'PATH', 'METHOD', 'SERVER', 'CONTENT']):
+            fc_env[k] = v[:200]
+    diag['fc_env_vars'] = fc_env
+    
+    # Build response
+    response_body = json.dumps(diag, indent=2, default=str)
+    
+    # If arg2 is callable, it's WSGI mode — respond via WSGI
+    if callable(context_or_start_response):
+        start_response = context_or_start_response
+        start_response('200 OK', [('Content-Type', 'application/json'), ('Access-Control-Allow-Origin', '*')])
+        return [response_body.encode('utf-8')]
+    else:
+        # Event mode — return dict
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': response_body
+        }
