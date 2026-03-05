@@ -84,7 +84,7 @@ jobs:
             echo "        OSS_ENDPOINT: '${OSS_ENDPOINT}'"
             echo "        OSS_ACCESS_KEY_ID: '${OSS_ACCESS_KEY_ID}'"
             echo "        OSS_ACCESS_KEY_SECRET: '${OSS_ACCESS_KEY_SECRET}'"
-            echo "        RDS_HOST: '${RDS_HOST}'"
+            echo "        RDS_HOST: 'rm-gs5taq0avep28159obo.rwlb.singapore.rds.aliyuncs.com'"
             echo "        RDS_PORT: '${RDS_PORT}'"
             echo "        RDS_DATABASE: '${RDS_DATABASE}'"
             echo "        RDS_USER: '${RDS_USER}'"
@@ -201,5 +201,6 @@ jobs:
         run: |
           ossutil bucket-acl "oss://$OSS_BUCKET" public-read || ossutil set-acl "oss://$OSS_BUCKET" public-read -b || true
           echo "Bucket ACL set to public-read"
-F o r c e   r u n :   0 3 / 0 5 / 2 0 2 6   2 3 : 4 0 : 1 0  
+F o r c e   r u n :   0 3 / 0 5 / 2 0 2 6   2 3 : 4 0 : 1 0 
+ 
  
