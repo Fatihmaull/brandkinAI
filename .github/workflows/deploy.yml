@@ -59,9 +59,11 @@ jobs:
           cp *.py fc-functions/ 2>/dev/null || true
           cp -r orchestrator stage_handlers utils prompts fc-functions/ 2>/dev/null || true
           
-          # Copy requirements.txt to the function directory so FC natively builds it
-          # This ensures binary compatibility with the Alibaba Cloud Python runtime
-          cp requirements.txt fc-functions/
+          # CRITICAL FIX for 502 Bad Gateway (GLIBC/Import mismatch):
+          # We cannot pip install directly on Ubuntu because it generates incompatible C-binaries.
+          # We must use Docker with a stable Linux (Buster) to compile dependencies compatible with Alibaba Cloud FC.
+          docker run --rm -v $(pwd):/workspace -w /workspace python:3.10-slim-buster pip install -r requirements.txt -t fc-functions/
+          sudo chown -R $USER:$USER fc-functions/
           
           generate_function() {
             local svc_name=$1 fn_name=$2 desc=$3 handler=$4 mem=$5 timeout=$6 triggers=$7
