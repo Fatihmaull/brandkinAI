@@ -197,11 +197,20 @@ def _original_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     }
 
 def handler(environ_or_event, context_or_start_response):
-    """Production WSGI Adapter for FC 3.0 HTTP Triggers."""
+    """
+    Universal FC 3.0 Handler.
+    
+    FC 3.0 HTTP Triggers with Python can invoke in MULTIPLE formats:
+    1. WSGI: (environ_dict, start_response_callable)  
+    2. Raw HTTP: (request_bytes, fc_context_object)
+    3. Event dict: (event_dict, fc_context_object)
+    
+    This handler auto-detects the format and normalizes it.
+    """
     import urllib.parse
     
+    # === FORMAT 1: WSGI MODE ===
     if callable(context_or_start_response):
-        # WSGI Mode
         environ = environ_or_event
         start_response = context_or_start_response
         
@@ -232,19 +241,84 @@ def handler(environ_or_event, context_or_start_response):
         status = f"{result.get('statusCode', 200)} Response"
         if result.get('statusCode') == 200: status = "200 OK"
             
-        headers = [(str(k), str(v)) for k, v in result.get('headers', {}).items()]
+        resp_headers = [(str(k), str(v)) for k, v in result.get('headers', {}).items()]
         if 'Content-Type' not in result.get('headers', {}):
-            headers.append(('Content-Type', 'application/json'))
+            resp_headers.append(('Content-Type', 'application/json'))
             
-        start_response(status, headers)
+        start_response(status, resp_headers)
         body = result.get('body', '')
         if isinstance(body, dict): body = json.dumps(body)
         return [body.encode('utf-8') if isinstance(body, str) else body]
     
     else:
-        # Event Mode
+        # === FORMAT 2 or 3: Raw bytes or Event dict ===
+        context = context_or_start_response
+        event = environ_or_event
+        
+        # If event is raw bytes, parse the HTTP request
+        if isinstance(event, (bytes, bytearray)):
+            try:
+                raw = event.decode('utf-8')
+                
+                # Try to parse as JSON directly (some FC versions send JSON bytes)
+                try:
+                    event = json.loads(raw)
+                except json.JSONDecodeError:
+                    # It's a raw HTTP request string, parse it manually
+                    # Format: "POST /path HTTP/1.1\r\nHeaders\r\n\r\nBody"
+                    parts = raw.split('\r\n\r\n', 1)
+                    header_section = parts[0]
+                    body_section = parts[1] if len(parts) > 1 else '{}'
+                    
+                    lines = header_section.split('\r\n')
+                    request_line = lines[0] if lines else 'GET / HTTP/1.1'
+                    method_path = request_line.split(' ')
+                    
+                    event = {
+                        'httpMethod': method_path[0] if len(method_path) > 0 else 'GET',
+                        'path': method_path[1] if len(method_path) > 1 else '/',
+                        'pathParameters': {},
+                        'queryStringParameters': {},
+                        'headers': {},
+                        'body': body_section
+                    }
+                    
+                    # Parse query string if present
+                    if '?' in event['path']:
+                        path_parts = event['path'].split('?', 1)
+                        event['path'] = path_parts[0]
+                        event['queryStringParameters'] = {k: v[0] for k, v in urllib.parse.parse_qs(path_parts[1]).items()}
+                    
+                    # Parse headers
+                    for line in lines[1:]:
+                        if ':' in line:
+                            key, value = line.split(':', 1)
+                            event['headers'][key.strip().lower()] = value.strip()
+                            
+            except Exception as e:
+                import traceback
+                return {
+                    'statusCode': 500,
+                    'headers': {'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({
+                        'error': 'Failed to parse raw bytes event',
+                        'details': str(e),
+                        'raw_preview': repr(environ_or_event[:500]) if len(environ_or_event) > 0 else 'empty',
+                        'trace': traceback.format_exc()
+                    })
+                }
+        
+        # If event is a string, try to parse as JSON
+        elif isinstance(event, str):
+            try:
+                event = json.loads(event)
+            except json.JSONDecodeError:
+                event = {'httpMethod': 'GET', 'path': '/', 'body': event}
+        
+        # Now event should be a dict
         try:
-            return _original_handler(environ_or_event, context_or_start_response)
+            return _original_handler(event, context)
         except Exception as e:
             import traceback
             return {'statusCode': 500, 'body': json.dumps({'error': str(e), 'trace': traceback.format_exc()})}
+
