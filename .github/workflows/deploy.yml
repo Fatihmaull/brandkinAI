@@ -56,12 +56,18 @@ jobs:
         run: |
           # Install dependencies into the fc-functions directory
           echo "Installing Python dependencies..."
+          mkdir -p fc-functions
           cat << 'EOF' > fc-functions/requirements.txt
           pymysql==1.0.3
           requests>=2.28.0,<3.0.0
           aliyun-python-sdk-core==2.15.1
           EOF
           pip install -r fc-functions/requirements.txt -t fc-functions/
+          
+          # CRITICAL FIX: Copy the actual backend source code into the deployment folder
+          echo "Copying source code to deployment package..."
+          cp *.py fc-functions/ 2>/dev/null || true
+          cp -r orchestrator stage_handlers utils prompts fc-functions/ 2>/dev/null || true
           
           generate_function() {
             local svc_name=$1 fn_name=$2 desc=$3 handler=$4 mem=$5 timeout=$6 triggers=$7
