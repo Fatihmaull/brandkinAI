@@ -6,199 +6,36 @@ FC 3.0 HTTP handler for API Gateway routes
 import json
 import logging
 import re
+import os
+import sys
+import importlib
 from typing import Dict, Any, Optional
 
-import sys
-sys.path.append('/code')  # FC 3.0 working directory
-
-# CRITICAL 502 FIX: Alibaba Cloud SDK requires 'Crypto' (capital C), 
-# but Linux pip often installs it as 'crypto'. This prevents the 502 Boot Crash.
-try:
-    import crypto
-    import sys
-    sys.modules['Crypto'] = crypto
-    sys.modules['Crypto.Hash'] = crypto.Hash
-    sys.modules['Crypto.Cipher'] = crypto.Cipher
-    sys.modules['Crypto.Util'] = crypto.Util
-except ImportError:
-    pass
-
-from stage_handlers import (
-    stage0_init,
-    stage1_dna,
-    stage2_visual,
-    stage3_selection,
-    stage4_poses,
-    stage5_code,
-    stage6_revision,
-    stage7_assembly
-)
-from utils.database import db
-
+# Initialize logger
 logger = logging.getLogger(__name__)
 
-# Allowed CORS origins (configure via env var for production)
-import os
-CORS_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '*')
-
-
-def _original_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    """
-    Main API entry point for all routes.
-    
-    Routes:
-    - POST /api/v1/projects -> Stage 0: Initialize
-    - GET  /api/v1/projects/{id} -> Get project status
-    - GET  /api/v1/projects/{id}/assets -> Get project assets
-    - GET  /api/v1/projects/{id}/code -> Get code exports
-    - POST /api/v1/projects/{id}/select -> Stage 3: Character selection
-    - POST /api/v1/projects/{id}/revise -> Stage 6: Revision
-    - POST /api/v1/projects/{id}/finalize -> Stage 7: Assembly
-    - GET  /health -> Health check
-    """
-    
-    http_method = event.get('httpMethod', 'GET')
-    path = event.get('path', '')
-    path_params = event.get('pathParameters', {}) or {}
-    
-    headers = {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': CORS_ORIGINS,
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-App-Key, X-Timestamp, X-Nonce, X-Signature'
-    }
-    
-    # Handle OPTIONS for CORS
-    if http_method == 'OPTIONS':
-        return {'statusCode': 200, 'headers': headers, 'body': ''}
-    
-    try:
-        # Parse route
-        route = _match_route(http_method, path, path_params)
-        
-        if route == 'health':
-            return {
-                'statusCode': 200,
-                'headers': headers,
-                'body': json.dumps({'status': 'ok', 'service': 'BrandKin AI'})
-            }
-        
-        # Helper to ensure CORS headers are on sub-handler responses
-        def _with_cors(response):
-            if isinstance(response, dict):
-                response_headers = response.get('headers', {})
-                response_headers.update(headers)
-                response['headers'] = response_headers
-            return response
-        
-        if route == 'create_project':
-            return _with_cors(stage0_init.handler(event, context))
-        
-        if route == 'get_project':
-            project_id = path_params.get('id') or _extract_project_id(path)
-            if project_id:
-                return get_project_status(project_id, headers)
-        
-        if route == 'get_assets':
-            project_id = path_params.get('id') or _extract_project_id(path)
-            if project_id:
-                return get_project_assets(project_id, headers)
-        
-        if route == 'get_code':
-            project_id = path_params.get('id') or _extract_project_id(path)
-            if project_id:
-                return get_code_exports(project_id, headers)
-        
-        if route == 'select_character':
-            return _with_cors(stage3_selection.handler(event, context))
-        
-        if route == 'revise':
-            return _with_cors(stage6_revision.handler(event, context))
-        
-        if route == 'finalize':
-            return _with_cors(stage7_assembly.handler(event, context))
-        
-        # 404 for unmatched routes
-        return {
-            'statusCode': 404,
-            'headers': headers,
-            'body': json.dumps({'error': 'Route not found'})
-        }
-        
-    except Exception as e:
-        import traceback
-        error_details = traceback.format_exc()
-        logger.error(f"API handler error on {http_method} {path}: {error_details}")
-        return {
-            'statusCode': 500,
-            'headers': headers,
-            'body': json.dumps({
-                'error': 'Internal server error',
-                'details': str(e),
-                'traceback': error_details
-            })
-        }
-
-
 def _match_route(method: str, path: str, path_params: dict) -> str:
-    """Match HTTP method + path to a named route.
-    
-    Uses explicit path matching to avoid ambiguous substring matches.
-    """
-    # Normalize path
+    """Match HTTP method + path to a named route."""
     path = path.rstrip('/')
-    
-    if method == 'GET' and path == '/health':
-        return 'health'
-    
-    if method == 'POST' and path == '/api/v1/projects':
-        return 'create_project'
-    
-    # Match: /api/v1/projects/{id}/select
-    if method == 'POST' and re.match(r'^/api/v1/projects/[^/]+/select$', path):
-        return 'select_character'
-    
-    # Match: /api/v1/projects/{id}/revise
-    if method == 'POST' and re.match(r'^/api/v1/projects/[^/]+/revise$', path):
-        return 'revise'
-    
-    # Match: /api/v1/projects/{id}/finalize
-    if method == 'POST' and re.match(r'^/api/v1/projects/[^/]+/finalize$', path):
-        return 'finalize'
-    
-    # Match: /api/v1/projects/{id}/assets
-    if method == 'GET' and re.match(r'^/api/v1/projects/[^/]+/assets$', path):
-        return 'get_assets'
-    
-    # Match: /api/v1/projects/{id}/code
-    if method == 'GET' and re.match(r'^/api/v1/projects/[^/]+/code$', path):
-        return 'get_code'
-    
-    # Match: /api/v1/projects/{id} (must be last to avoid catching sub-routes)
-    if method == 'GET' and re.match(r'^/api/v1/projects/[^/]+$', path):
-        return 'get_project'
-    
+    if method == 'GET' and path == '/health': return 'health'
+    if method == 'POST' and path == '/api/v1/projects': return 'create_project'
+    if method == 'POST' and re.match(r'^/api/v1/projects/[^/]+/select$', path): return 'select_character'
+    if method == 'POST' and re.match(r'^/api/v1/projects/[^/]+/revise$', path): return 'revise'
+    if method == 'POST' and re.match(r'^/api/v1/projects/[^/]+/finalize$', path): return 'finalize'
+    if method == 'GET' and re.match(r'^/api/v1/projects/[^/]+/assets$', path): return 'get_assets'
+    if method == 'GET' and re.match(r'^/api/v1/projects/[^/]+/code$', path): return 'get_code'
+    if method == 'GET' and re.match(r'^/api/v1/projects/[^/]+$', path): return 'get_project'
     return 'not_found'
 
-
 def _extract_project_id(path: str) -> Optional[str]:
-    """Extract project ID from path like /api/v1/projects/{id}/..."""
     match = re.match(r'^/api/v1/projects/([^/]+)', path)
     return match.group(1) if match else None
 
-
-def get_project_status(project_id: str, headers: Dict) -> Dict[str, Any]:
-    """Get project status and current stage info."""
+def get_project_status(project_id: str, headers: Dict, db: Any) -> Dict[str, Any]:
     project = db.get_project(project_id)
-    
     if not project:
-        return {
-            'statusCode': 404,
-            'headers': headers,
-            'body': json.dumps({'error': 'Project not found'})
-        }
+        return {'statusCode': 404, 'headers': headers, 'body': json.dumps({'error': 'Project not found'})}
     
-    # Get assets summary
     assets = db.get_project_assets(project_id)
     asset_summary = {
         'mascot': len([a for a in assets if a['asset_type'] == 'mascot']),
@@ -227,180 +64,187 @@ def get_project_status(project_id: str, headers: Dict) -> Dict[str, Any]:
         } if brand_kit else None
     }
     
-    # Include full asset details for Stage 2 (awaiting selection)
     if project.get('current_stage') == 2 and project.get('status') == 'awaiting_selection':
         mascot_assets = [a for a in assets if a['asset_type'] == 'mascot']
         avatar_assets = [a for a in assets if a['asset_type'] == 'avatar']
-        
         if mascot_assets and avatar_assets:
             response['last_stage_result'] = {
                 'assets': {
-                    'mascot': {
-                        'asset_id': mascot_assets[0]['asset_id'],
-                        'oss_url': mascot_assets[0].get('oss_url'),
-                        'transparent_url': mascot_assets[0].get('transparent_url')
-                    },
-                    'avatar': {
-                        'asset_id': avatar_assets[0]['asset_id'],
-                        'oss_url': avatar_assets[0].get('oss_url'),
-                        'transparent_url': avatar_assets[0].get('transparent_url')
-                    }
+                    'mascot': { 'asset_id': mascot_assets[0]['asset_id'], 'oss_url': mascot_assets[0].get('oss_url'), 'transparent_url': mascot_assets[0].get('transparent_url') },
+                    'avatar': { 'asset_id': avatar_assets[0]['asset_id'], 'oss_url': avatar_assets[0].get('oss_url'), 'transparent_url': avatar_assets[0].get('transparent_url') }
                 }
             }
     
-    return {
-        'statusCode': 200,
-        'headers': headers,
-        'body': json.dumps(response)
-    }
+    return {'statusCode': 200, 'headers': headers, 'body': json.dumps(response)}
 
-
-def get_project_assets(project_id: str, headers: Dict) -> Dict[str, Any]:
-    """Get all assets for a project."""
+def get_project_assets(project_id: str, headers: Dict, db: Any) -> Dict[str, Any]:
     project = db.get_project(project_id)
-    
     if not project:
-        return {
-            'statusCode': 404,
-            'headers': headers,
-            'body': json.dumps({'error': 'Project not found'})
-        }
-    
+        return {'statusCode': 404, 'headers': headers, 'body': json.dumps({'error': 'Project not found'})}
     assets = db.get_project_assets(project_id)
-    
-    formatted_assets = []
-    for asset in assets:
-        formatted_assets.append({
-            'asset_id': asset['asset_id'],
-            'type': asset['asset_type'],
-            'stage': asset['stage'],
-            'oss_url': asset.get('oss_url'),
-            'transparent_url': asset.get('transparent_url'),
-            'is_selected': asset.get('is_selected', False),
-            'metadata': asset.get('metadata'),
-            'created_at': asset.get('created_at').isoformat() if asset.get('created_at') else None
-        })
-    
-    return {
-        'statusCode': 200,
-        'headers': headers,
-        'body': json.dumps({
-            'project_id': project_id,
-            'assets': formatted_assets
-        })
-    }
+    formatted = [{
+        'asset_id': a['asset_id'], 'type': a['asset_type'], 'stage': a['stage'],
+        'oss_url': a.get('oss_url'), 'transparent_url': a.get('transparent_url'),
+        'is_selected': a.get('is_selected', False), 'metadata': a.get('metadata'),
+        'created_at': a.get('created_at').isoformat() if a.get('created_at') else None
+    } for a in assets]
+    return {'statusCode': 200, 'headers': headers, 'body': json.dumps({'project_id': project_id, 'assets': formatted})}
 
-
-def get_code_exports(project_id: str, headers: Dict) -> Dict[str, Any]:
-    """Get all code exports for a project."""
+def get_code_exports(project_id: str, headers: Dict, db: Any) -> Dict[str, Any]:
     project = db.get_project(project_id)
-    
     if not project:
-        return {
-            'statusCode': 404,
-            'headers': headers,
-            'body': json.dumps({'error': 'Project not found'})
-        }
-    
+        return {'statusCode': 404, 'headers': headers, 'body': json.dumps({'error': 'Project not found'})}
     exports = db.get_code_exports(project_id)
-    
-    formatted_exports = []
-    for export in exports:
-        formatted_exports.append({
-            'export_id': export['export_id'],
-            'component_name': export.get('component_name'),
-            'react_code': export.get('react_code'),
-            'css_keyframes': export.get('css_keyframes'),
-            'usage_snippet': export.get('usage_snippet'),
-            'created_at': export.get('created_at').isoformat() if export.get('created_at') else None
-        })
-    
-    return {
-        'statusCode': 200,
-        'headers': headers,
-        'body': json.dumps({
-            'project_id': project_id,
-            'code_exports': formatted_exports
-        })
-    }
+    formatted = [{
+        'export_id': e['export_id'], 'component_name': e.get('component_name'),
+        'react_code': e.get('react_code'), 'css_keyframes': e.get('css_keyframes'),
+        'usage_snippet': e.get('usage_snippet'),
+        'created_at': e.get('created_at').isoformat() if e.get('created_at') else None
+    } for e in exports]
+    return {'statusCode': 200, 'headers': headers, 'body': json.dumps({'project_id': project_id, 'code_exports': formatted})}
 
+def _original_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+    """Main API entry point with LAZY LOADING to prevent 502 Boot Crashes."""
+    
+    # 1. Critical Aliases and Paths
+    if '/code' not in sys.path:
+        sys.path.append('/code')
+        
+    try:
+        import crypto
+        sys.modules['Crypto'] = crypto
+        sys.modules['Crypto.Hash'] = crypto.Hash
+        sys.modules['Crypto.Cipher'] = crypto.Cipher
+        sys.modules['Crypto.Util'] = crypto.Util
+    except ImportError:
+        pass
+
+    # 2. Lazy imports (The core fix for the silent 502)
+    try:
+        from utils.database import db
+        handlers = {
+            'stage0_init': importlib.import_module('stage_handlers.stage0_init'),
+            'stage3_selection': importlib.import_module('stage_handlers.stage3_selection'),
+            'stage6_revision': importlib.import_module('stage_handlers.stage6_revision'),
+            'stage7_assembly': importlib.import_module('stage_handlers.stage7_assembly')
+        }
+    except Exception as e:
+        import traceback
+        return {
+            'statusCode': 500,
+            'headers': {'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({
+                'error': 'Module Import Failure (Lazy Loading)',
+                'details': str(e),
+                'traceback': traceback.format_exc()
+            })
+        }
+
+    http_method = event.get('httpMethod', 'GET')
+    path = event.get('path', '')
+    path_params = event.get('pathParameters', {}) or {}
+    
+    headers = {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': os.environ.get('CORS_ALLOWED_ORIGINS', '*'),
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-App-Key, X-Timestamp, X-Nonce, X-Signature'
+    }
+    
+    if http_method == 'OPTIONS':
+        return {'statusCode': 200, 'headers': headers, 'body': ''}
+    
+    def _with_cors(response):
+        if isinstance(response, dict):
+            resp_headers = response.get('headers', {})
+            resp_headers.update(headers)
+            response['headers'] = resp_headers
+        return response
+
+    route = _match_route(http_method, path, path_params)
+    
+    if route == 'health':
+        return {'statusCode': 200, 'headers': headers, 'body': json.dumps({'status': 'ok', 'env': 'FC 3.0'})}
+
+    if route == 'create_project':
+        return _with_cors(handlers['stage0_init'].handler(event, context))
+    
+    if route == 'get_project':
+        project_id = path_params.get('id') or _extract_project_id(path)
+        return get_project_status(project_id, headers, db) if project_id else {'statusCode': 400, 'body': 'id required'}
+        
+    if route == 'get_assets':
+        project_id = path_params.get('id') or _extract_project_id(path)
+        return get_project_assets(project_id, headers, db) if project_id else {'statusCode': 400, 'body': 'id required'}
+        
+    if route == 'get_code':
+        project_id = path_params.get('id') or _extract_project_id(path)
+        return get_code_exports(project_id, headers, db) if project_id else {'statusCode': 400, 'body': 'id required'}
+
+    if route == 'select_character':
+        return _with_cors(handlers['stage3_selection'].handler(event, context))
+    
+    if route == 'revise':
+        return _with_cors(handlers['stage6_revision'].handler(event, context))
+        
+    if route == 'finalize':
+        return _with_cors(handlers['stage7_assembly'].handler(event, context))
+
+    return {
+        'statusCode': 404,
+        'headers': headers,
+        'body': json.dumps({'error': 'Route not found: ' + (path or '/')})
+    }
 
 def handler(environ_or_event, context_or_start_response):
-    """
-    Production WSGI Adapter for FC 3.0 HTTP Triggers.
-    Seamlessly translates between WSGI (Alibaba Linux) and Event (Application Logic) formats.
-    """
+    """Production WSGI Adapter for FC 3.0 HTTP Triggers."""
     import urllib.parse
     
-    # 1. Detect if this is a WSGI call (HTTP Trigger) or a raw Event call (Test/MNS)
     if callable(context_or_start_response):
-        # --- WSGI MODE ---
+        # WSGI Mode
         environ = environ_or_event
         start_response = context_or_start_response
         
-        # Build API Gateway styled event payload from WSGI environ
         event = {
             'httpMethod': environ.get('REQUEST_METHOD', 'GET'),
             'path': environ.get('PATH_INFO', ''),
             'pathParameters': {},
-            'queryStringParameters': {k: v[0] if isinstance(v, list) else v for k, v in urllib.parse.parse_qs(environ.get('QUERY_STRING', '')).items()},
+            'queryStringParameters': {k: v[0] for k, v in urllib.parse.parse_qs(environ.get('QUERY_STRING', '')).items()},
             'headers': {k[5:].replace('_', '-').lower(): v for k, v in environ.items() if k.startswith('HTTP_')},
         }
         
-        # Read request body from wsgi.input
         try:
-            request_body_size = int(environ.get('CONTENT_LENGTH', 0))
-        except (ValueError, TypeError):
-            request_body_size = 0
-            
-        if request_body_size > 0:
-            event['body'] = environ['wsgi.input'].read(request_body_size).decode('utf-8')
-        else:
+            size = int(environ.get('CONTENT_LENGTH', 0))
+            event['body'] = environ['wsgi.input'].read(size).decode('utf-8') if size > 0 else "{}"
+        except:
             event['body'] = "{}"
             
-        # Get FC Context from environ
-        context = environ.get('fc.context', None)
-        
-
-        # Call the original logic-heavy handler
         try:
-            raw_result = _original_handler(event, context)
-            result = raw_result if isinstance(raw_result, dict) else {}
+            result = _original_handler(event, environ.get('fc.context'))
         except Exception as e:
             import traceback
-            logger.error(f"Internal Logic Error: {e}", exc_info=True)
             result = {
                 'statusCode': 500,
-                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                'body': json.dumps({'error': str(e), 'trace': traceback.format_exc()})
+                'headers': {'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'error': 'Internal Crash', 'details': str(e), 'trace': traceback.format_exc()})
             }
         
-        # Convert the dict result back into WSGI Response
-        status_code = result.get('statusCode', 200)
-        # WSGI requires a string like "200 OK"
-        status_str = "200 OK" if status_code == 200 else f"{status_code} Response"
-        
-        headers_dict = result.get('headers', {})
-        if not isinstance(headers_dict, dict):
-            headers_dict = {}
+        status = f"{result.get('statusCode', 200)} Response"
+        if result.get('statusCode') == 200: status = "200 OK"
             
-        if 'Content-Type' not in headers_dict:
-            headers_dict['Content-Type'] = 'application/json'
-        
-        response_headers = [(str(k), str(v)) for k, v in headers_dict.items()]
-        
-        # Execute WSGI handshake
-        start_response(status_str, response_headers)
-        
-        # Return the body as a byte-iterable
-        body_content = result.get('body', '')
-        if isinstance(body_content, dict):
-            body_content = json.dumps(body_content)
-        elif not isinstance(body_content, str):
-            body_content = str(body_content)
+        headers = [(str(k), str(v)) for k, v in result.get('headers', {}).items()]
+        if 'Content-Type' not in result.get('headers', {}):
+            headers.append(('Content-Type', 'application/json'))
             
-        return [body_content.encode('utf-8')]
+        start_response(status, headers)
+        body = result.get('body', '')
+        if isinstance(body, dict): body = json.dumps(body)
+        return [body.encode('utf-8') if isinstance(body, str) else body]
     
     else:
-        # --- EVENT MODE (Fallback for console tests or local development) ---
-        return _original_handler(environ_or_event, context_or_start_response)
+        # Event Mode
+        try:
+            return _original_handler(environ_or_event, context_or_start_response)
+        except Exception as e:
+            import traceback
+            return {'statusCode': 500, 'body': json.dumps({'error': str(e), 'trace': traceback.format_exc()})}
