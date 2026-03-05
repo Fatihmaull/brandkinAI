@@ -77,7 +77,6 @@ jobs:
             echo "      timeout: ${timeout}"
             echo "      code: ./fc-functions"
             echo "      environmentVariables:"
-            echo "        PYTHONPATH: /code"
             echo "        MODELSTUDIO_API_KEY: '${MODELSTUDIO_API_KEY}'"
             echo "        OSS_BUCKET: '${OSS_BUCKET}'"
             echo "        OSS_ENDPOINT: '${OSS_ENDPOINT}'"
