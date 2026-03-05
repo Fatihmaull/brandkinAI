@@ -114,11 +114,17 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         }
         
     except Exception as e:
-        logger.error(f"API handler error on {http_method} {path}: {e}", exc_info=True)
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error(f"API handler error on {http_method} {path}: {error_details}")
         return {
             'statusCode': 500,
             'headers': headers,
-            'body': json.dumps({'error': 'Internal server error'})
+            'body': json.dumps({
+                'error': 'Internal server error',
+                'details': str(e),
+                'traceback': error_details
+            })
         }
 
 
