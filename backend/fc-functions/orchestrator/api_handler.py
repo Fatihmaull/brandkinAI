@@ -324,56 +324,83 @@ def get_code_exports(project_id: str, headers: Dict) -> Dict[str, Any]:
         })
     }
 
+
 def handler(environ_or_event, context_or_start_response):
     """
-    Diagnostic handler to discover EXACTLY what FC 3.0 is passing.
+    Production WSGI Adapter for FC 3.0 HTTP Triggers.
+    Seamlessly translates between WSGI (Alibaba Linux) and Event (Application Logic) formats.
     """
-    try:
-        if isinstance(environ_or_event, dict) and 'httpMethod' in environ_or_event:
-            # It's an API Gateway dict
-            return _original_handler(environ_or_event, context_or_start_response)
+    import urllib.parse
+    
+    # 1. Detect if this is a WSGI call (HTTP Trigger) or a raw Event call (Test/MNS)
+    if callable(context_or_start_response):
+        # --- WSGI MODE ---
+        environ = environ_or_event
+        start_response = context_or_start_response
         
-        # If we reach here, the infrastructure is passing something unexpected (like bytes)
-        # Let's inspect it and return a 200 OK so the 502 vanishes and we can read the payload!
-        event_type = str(type(environ_or_event))
-        event_str = str(environ_or_event)
+        # Build API Gateway styled event payload from WSGI environ
+        event = {
+            'httpMethod': environ.get('REQUEST_METHOD', 'GET'),
+            'path': environ.get('PATH_INFO', ''),
+            'pathParameters': {},
+            'queryStringParameters': {k: v[0] if isinstance(v, list) else v for k, v in urllib.parse.parse_qs(environ.get('QUERY_STRING', '')).items()},
+            'headers': {k[5:].replace('_', '-').lower(): v for k, v in environ.items() if k.startswith('HTTP_')},
+        }
         
-        # Attempt to parse as JSON if it's bytes
-        import json
-        if isinstance(environ_or_event, bytes):
-            try:
-                parsed = json.loads(environ_or_event.decode('utf-8'))
-                if isinstance(parsed, dict) and 'httpMethod' in parsed:
-                    return _original_handler(parsed, context_or_start_response)
-                event_str = "JSON parsed: " + str(parsed)
-            except Exception as e:
-                event_str = "Bytes (failed to parse JSON): " + str(e) + " | " + repr(environ_or_event[:200])
-                
-        # If it's a WSGI environ, start_response will be callable
-        if callable(context_or_start_response):
-            context_or_start_response('200 OK', [('Content-Type', 'application/json')])
-            return [json.dumps({
-                'debug': 'WSGI detected',
-                'environ_keys': list(environ_or_event.keys()) if isinstance(environ_or_event, dict) else event_type
-            }).encode('utf-8')]
+        # Read request body from wsgi.input
+        try:
+            request_body_size = int(environ.get('CONTENT_LENGTH', 0))
+        except (ValueError, TypeError):
+            request_body_size = 0
             
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            'body': json.dumps({
-                'error': 'Unhandled FC 3.0 Trigger Format',
-                'event_type': event_type,
-                'event_content': event_str,
-                'context_type': str(type(context_or_start_response))
-            })
-        }
-    except Exception as e:
-        import traceback
-        return {
-            'statusCode': 500,
-            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-            'body': json.dumps({'error': str(e), 'trace': traceback.format_exc()})
-        }
+        if request_body_size > 0:
+            event['body'] = environ['wsgi.input'].read(request_body_size).decode('utf-8')
+        else:
+            event['body'] = "{}"
+            
+        # Get FC Context from environ
+        context = environ.get('fc.context', None)
+        
+
+        # Call the original logic-heavy handler
+        try:
+            raw_result = _original_handler(event, context)
+            result = raw_result if isinstance(raw_result, dict) else {}
+        except Exception as e:
+            import traceback
+            logger.error(f"Internal Logic Error: {e}", exc_info=True)
+            result = {
+                'statusCode': 500,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'error': str(e), 'trace': traceback.format_exc()})
+            }
+        
+        # Convert the dict result back into WSGI Response
+        status_code = result.get('statusCode', 200)
+        # WSGI requires a string like "200 OK"
+        status_str = "200 OK" if status_code == 200 else f"{status_code} Response"
+        
+        headers_dict = result.get('headers', {})
+        if not isinstance(headers_dict, dict):
+            headers_dict = {}
+            
+        if 'Content-Type' not in headers_dict:
+            headers_dict['Content-Type'] = 'application/json'
+        
+        response_headers = [(str(k), str(v)) for k, v in headers_dict.items()]
+        
+        # Execute WSGI handshake
+        start_response(status_str, response_headers)
+        
+        # Return the body as a byte-iterable
+        body_content = result.get('body', '')
+        if isinstance(body_content, dict):
+            body_content = json.dumps(body_content)
+        elif not isinstance(body_content, str):
+            body_content = str(body_content)
+            
+        return [body_content.encode('utf-8')]
+    
+    else:
+        # --- EVENT MODE (Fallback for console tests or local development) ---
+        return _original_handler(environ_or_event, context_or_start_response)
