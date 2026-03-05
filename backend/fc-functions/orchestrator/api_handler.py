@@ -11,6 +11,18 @@ from typing import Dict, Any, Optional
 import sys
 sys.path.append('/code')  # FC 3.0 working directory
 
+# CRITICAL 502 FIX: Alibaba Cloud SDK requires 'Crypto' (capital C), 
+# but Linux pip often installs it as 'crypto'. This prevents the 502 Boot Crash.
+try:
+    import crypto
+    import sys
+    sys.modules['Crypto'] = crypto
+    sys.modules['Crypto.Hash'] = crypto.Hash
+    sys.modules['Crypto.Cipher'] = crypto.Cipher
+    sys.modules['Crypto.Util'] = crypto.Util
+except ImportError:
+    pass
+
 from stage_handlers import (
     stage0_init,
     stage1_dna,
