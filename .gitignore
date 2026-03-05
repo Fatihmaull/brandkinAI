@@ -10,6 +10,12 @@ __pycache__/
 .env
 .env.local
 .env.*.local
+backend/.env
+# Diagnostic / test scripts that may contain credentials
+backend/deep_diagnostic.py
+backend/isolated_test.py
+backend/scan_rds.py
+backend/diag_output.txt
 
 # Build outputs
 .next/
