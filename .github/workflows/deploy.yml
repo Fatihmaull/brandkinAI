@@ -54,6 +54,11 @@ jobs:
           RDS_USER: ${{ secrets.RDS_USER }}
           RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
         run: |
+          # Create deployment directory and copy all Python source code into it
+          mkdir -p fc-functions
+          cp *.py fc-functions/ 2>/dev/null || true
+          cp -r orchestrator stage_handlers utils prompts fc-functions/ 2>/dev/null || true
+          
           # Copy requirements.txt to the function directory so FC natively builds it
           # This ensures binary compatibility with the Alibaba Cloud Python runtime
           cp requirements.txt fc-functions/
