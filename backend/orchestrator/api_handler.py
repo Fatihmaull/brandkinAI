@@ -196,76 +196,79 @@ def _original_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         'body': json.dumps({'error': 'Route not found: ' + (path or '/')})
     }
 
-def handler(environ_or_event, context_or_start_response):
+
+def handler(event_bytes, fc_context):
     """
-    DIAGNOSTIC HANDLER - Temporarily dumps all FC 3.0 runtime info
-    to discover where HTTP method, path, and headers are stored.
+    Production FC 3.0 Handler.
+    
+    CONFIRMED FORMAT (from live diagnostic dump):
+    - arg1: bytes containing JSON: {"version":"v1", "rawPath":"/...", "headers":{...}, "body":"...", "requestContext":{...}}
+    - arg2: fc_rapis_context.FCContext (NOT callable, NOT WSGI)
+    
+    This handler converts the FC 3.0 JSON-bytes format into the internal event dict format.
     """
-    import os
-    
-    # Collect diagnostic data
-    diag = {
-        'arg1_type': str(type(environ_or_event)),
-        'arg2_type': str(type(context_or_start_response)),
-        'arg2_callable': callable(context_or_start_response),
-    }
-    
-    # Inspect arg1
-    if isinstance(environ_or_event, (bytes, bytearray)):
-        diag['arg1_preview'] = environ_or_event[:500].decode('utf-8', errors='replace')
-    elif isinstance(environ_or_event, dict):
-        diag['arg1_keys'] = list(environ_or_event.keys())[:30]
-        # Check for WSGI keys
-        for key in ['REQUEST_METHOD', 'PATH_INFO', 'QUERY_STRING', 'CONTENT_TYPE', 
-                     'CONTENT_LENGTH', 'SERVER_NAME', 'SERVER_PORT', 'wsgi.input',
-                     'fc.context', 'fc.request_uri', 'HTTP_HOST']:
-            if key in environ_or_event:
-                val = environ_or_event[key]
-                diag[f'arg1.{key}'] = str(val)[:200]
-    elif isinstance(environ_or_event, str):
-        diag['arg1_preview'] = environ_or_event[:500]
-    else:
-        diag['arg1_repr'] = repr(environ_or_event)[:500]
-    
-    # Inspect arg2 (context or start_response)
-    try:
-        diag['arg2_dir'] = [x for x in dir(context_or_start_response) if not x.startswith('__')]
-    except:
-        diag['arg2_dir'] = 'failed'
     
     try:
-        if hasattr(context_or_start_response, 'request_id'):
-            diag['arg2.request_id'] = str(context_or_start_response.request_id)
-        if hasattr(context_or_start_response, 'function'):
-            diag['arg2.function'] = str(context_or_start_response.function)
-        if hasattr(context_or_start_response, 'http_params'):
-            diag['arg2.http_params'] = str(context_or_start_response.http_params)
-        if hasattr(context_or_start_response, 'service'):
-            diag['arg2.service'] = str(context_or_start_response.service)
-        if hasattr(context_or_start_response, 'credentials'):
-            diag['arg2.credentials'] = 'present (hidden)'
+        # 1. Parse the FC 3.0 request bytes into a dict
+        if isinstance(event_bytes, (bytes, bytearray)):
+            fc_request = json.loads(event_bytes.decode('utf-8'))
+        elif isinstance(event_bytes, dict):
+            fc_request = event_bytes
+        elif isinstance(event_bytes, str):
+            fc_request = json.loads(event_bytes)
+        else:
+            fc_request = {}
+        
+        # 2. Extract HTTP metadata from the FC 3.0 request format
+        # FC 3.0 uses: rawPath, requestContext.http.method, headers, body, queryStringParameters
+        raw_path = fc_request.get('rawPath', '/')
+        
+        # HTTP method: check requestContext.http.method first, then fall back to headers
+        request_context = fc_request.get('requestContext', {})
+        http_info = request_context.get('http', {})
+        http_method = http_info.get('method', 'GET')
+        
+        # If method is still GET but we have no requestContext, try other common locations
+        if http_method == 'GET' and not http_info:
+            http_method = fc_request.get('httpMethod', 'GET')
+        
+        # Query string
+        query_params = fc_request.get('queryStringParameters', {}) or {}
+        
+        # Headers from FC 3.0 format
+        fc_headers = fc_request.get('headers', {}) or {}
+        
+        # Body
+        body = fc_request.get('body', '{}') or '{}'
+        if isinstance(body, dict):
+            body = json.dumps(body)
+        
+        # 3. Build the normalized event dict for _original_handler
+        event = {
+            'httpMethod': http_method,
+            'path': raw_path,
+            'pathParameters': fc_request.get('pathParameters', {}) or {},
+            'queryStringParameters': query_params,
+            'headers': fc_headers,
+            'body': body
+        }
+        
+        # 4. Call the main handler
+        result = _original_handler(event, fc_context)
+        
+        # 5. FC 3.0 expects a specific response format
+        return result
+        
     except Exception as e:
-        diag['arg2_inspect_error'] = str(e)
-    
-    # Inspect environment variables (FC-related)
-    fc_env = {}
-    for k, v in os.environ.items():
-        if any(prefix in k.upper() for prefix in ['FC_', 'HTTP_', 'REQUEST', 'PATH', 'METHOD', 'SERVER', 'CONTENT']):
-            fc_env[k] = v[:200]
-    diag['fc_env_vars'] = fc_env
-    
-    # Build response
-    response_body = json.dumps(diag, indent=2, default=str)
-    
-    # If arg2 is callable, it's WSGI mode — respond via WSGI
-    if callable(context_or_start_response):
-        start_response = context_or_start_response
-        start_response('200 OK', [('Content-Type', 'application/json'), ('Access-Control-Allow-Origin', '*')])
-        return [response_body.encode('utf-8')]
-    else:
-        # Event mode — return dict
+        import traceback
+        error_trace = traceback.format_exc()
+        logger.critical(f"Handler crash: {e}\n{error_trace}")
         return {
-            'statusCode': 200,
+            'statusCode': 500,
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-            'body': response_body
+            'body': json.dumps({
+                'error': 'Handler Crash',
+                'details': str(e),
+                'traceback': error_trace
+            })
         }
