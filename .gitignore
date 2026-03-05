@@ -32,3 +32,13 @@ local_storage/
 
 # Logs
 *.log
+
+# Ignore all dependencies installed locally in fc-functions
+fc-functions/*
+# BUT specifically allow the actual source code and folders to be tracked!
+!fc-functions/orchestrator/
+!fc-functions/stage_handlers/
+!fc-functions/utils/
+!fc-functions/prompts/
+!fc-functions/*.py
+!fc-functions/requirements.txt
