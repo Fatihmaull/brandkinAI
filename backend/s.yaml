@@ -22,16 +22,16 @@ services:
       code: ./fc-functions
       environmentVariables:
         PYTHONPATH: /code
-        MODELSTUDIO_API_KEY: ${env.MODELSTUDIO_API_KEY}
-        OSS_BUCKET: ${env.OSS_BUCKET}
-        OSS_ENDPOINT: ${env.OSS_ENDPOINT}
-        OSS_ACCESS_KEY_ID: ${env.OSS_ACCESS_KEY_ID}
-        OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}
-        RDS_HOST: ${env.RDS_HOST}
-        RDS_PORT: ${env.RDS_PORT}
-        RDS_DATABASE: ${env.RDS_DATABASE}
-        RDS_USER: ${env.RDS_USER}
-        RDS_PASSWORD: ${env.RDS_PASSWORD}
+        MODELSTUDIO_API_KEY: dummy
+        OSS_BUCKET: dummy
+        OSS_ENDPOINT: dummy
+        OSS_ACCESS_KEY_ID: dummy
+        OSS_ACCESS_KEY_SECRET: dummy
+        RDS_HOST: dummy
+        RDS_PORT: dummy
+        RDS_DATABASE: dummy
+        RDS_USER: dummy
+        RDS_PASSWORD: dummy
         CORS_ALLOWED_ORIGINS: "*"
       triggers:
         - triggerName: httpTrigger
@@ -58,16 +58,16 @@ services:
       code: ./fc-functions
       environmentVariables:
         PYTHONPATH: /code
-        MODELSTUDIO_API_KEY: ${env.MODELSTUDIO_API_KEY}
-        OSS_BUCKET: ${env.OSS_BUCKET}
-        OSS_ENDPOINT: ${env.OSS_ENDPOINT}
-        OSS_ACCESS_KEY_ID: ${env.OSS_ACCESS_KEY_ID}
-        OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}
-        RDS_HOST: ${env.RDS_HOST}
-        RDS_PORT: ${env.RDS_PORT}
-        RDS_DATABASE: ${env.RDS_DATABASE}
-        RDS_USER: ${env.RDS_USER}
-        RDS_PASSWORD: ${env.RDS_PASSWORD}
+        MODELSTUDIO_API_KEY: dummy
+        OSS_BUCKET: dummy
+        OSS_ENDPOINT: dummy
+        OSS_ACCESS_KEY_ID: dummy
+        OSS_ACCESS_KEY_SECRET: dummy
+        RDS_HOST: dummy
+        RDS_PORT: dummy
+        RDS_DATABASE: dummy
+        RDS_USER: dummy
+        RDS_PASSWORD: dummy
 
   stage2-visual:
     component: fc3
@@ -82,16 +82,16 @@ services:
       code: ./fc-functions
       environmentVariables:
         PYTHONPATH: /code
-        MODELSTUDIO_API_KEY: ${env.MODELSTUDIO_API_KEY}
-        OSS_BUCKET: ${env.OSS_BUCKET}
-        OSS_ENDPOINT: ${env.OSS_ENDPOINT}
-        OSS_ACCESS_KEY_ID: ${env.OSS_ACCESS_KEY_ID}
-        OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}
-        RDS_HOST: ${env.RDS_HOST}
-        RDS_PORT: ${env.RDS_PORT}
-        RDS_DATABASE: ${env.RDS_DATABASE}
-        RDS_USER: ${env.RDS_USER}
-        RDS_PASSWORD: ${env.RDS_PASSWORD}
+        MODELSTUDIO_API_KEY: dummy
+        OSS_BUCKET: dummy
+        OSS_ENDPOINT: dummy
+        OSS_ACCESS_KEY_ID: dummy
+        OSS_ACCESS_KEY_SECRET: dummy
+        RDS_HOST: dummy
+        RDS_PORT: dummy
+        RDS_DATABASE: dummy
+        RDS_USER: dummy
+        RDS_PASSWORD: dummy
 
   stage4-poses:
     component: fc3
@@ -106,16 +106,16 @@ services:
       code: ./fc-functions
       environmentVariables:
         PYTHONPATH: /code
-        MODELSTUDIO_API_KEY: ${env.MODELSTUDIO_API_KEY}
-        OSS_BUCKET: ${env.OSS_BUCKET}
-        OSS_ENDPOINT: ${env.OSS_ENDPOINT}
-        OSS_ACCESS_KEY_ID: ${env.OSS_ACCESS_KEY_ID}
-        OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}
-        RDS_HOST: ${env.RDS_HOST}
-        RDS_PORT: ${env.RDS_PORT}
-        RDS_DATABASE: ${env.RDS_DATABASE}
-        RDS_USER: ${env.RDS_USER}
-        RDS_PASSWORD: ${env.RDS_PASSWORD}
+        MODELSTUDIO_API_KEY: dummy
+        OSS_BUCKET: dummy
+        OSS_ENDPOINT: dummy
+        OSS_ACCESS_KEY_ID: dummy
+        OSS_ACCESS_KEY_SECRET: dummy
+        RDS_HOST: dummy
+        RDS_PORT: dummy
+        RDS_DATABASE: dummy
+        RDS_USER: dummy
+        RDS_PASSWORD: dummy
 
   stage5-code:
     component: fc3
@@ -130,16 +130,16 @@ services:
       code: ./fc-functions
       environmentVariables:
         PYTHONPATH: /code
-        MODELSTUDIO_API_KEY: ${env.MODELSTUDIO_API_KEY}
-        OSS_BUCKET: ${env.OSS_BUCKET}
-        OSS_ENDPOINT: ${env.OSS_ENDPOINT}
-        OSS_ACCESS_KEY_ID: ${env.OSS_ACCESS_KEY_ID}
-        OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}
-        RDS_HOST: ${env.RDS_HOST}
-        RDS_PORT: ${env.RDS_PORT}
-        RDS_DATABASE: ${env.RDS_DATABASE}
-        RDS_USER: ${env.RDS_USER}
-        RDS_PASSWORD: ${env.RDS_PASSWORD}
+        MODELSTUDIO_API_KEY: dummy
+        OSS_BUCKET: dummy
+        OSS_ENDPOINT: dummy
+        OSS_ACCESS_KEY_ID: dummy
+        OSS_ACCESS_KEY_SECRET: dummy
+        RDS_HOST: dummy
+        RDS_PORT: dummy
+        RDS_DATABASE: dummy
+        RDS_USER: dummy
+        RDS_PASSWORD: dummy
 
   stage7-assembly:
     component: fc3
@@ -154,13 +154,13 @@ services:
       code: ./fc-functions
       environmentVariables:
         PYTHONPATH: /code
-        MODELSTUDIO_API_KEY: ${env.MODELSTUDIO_API_KEY}
-        OSS_BUCKET: ${env.OSS_BUCKET}
-        OSS_ENDPOINT: ${env.OSS_ENDPOINT}
-        OSS_ACCESS_KEY_ID: ${env.OSS_ACCESS_KEY_ID}
-        OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}
-        RDS_HOST: ${env.RDS_HOST}
-        RDS_PORT: ${env.RDS_PORT}
-        RDS_DATABASE: ${env.RDS_DATABASE}
-        RDS_USER: ${env.RDS_USER}
-        RDS_PASSWORD: ${env.RDS_PASSWORD}
+        MODELSTUDIO_API_KEY: dummy
+        OSS_BUCKET: dummy
+        OSS_ENDPOINT: dummy
+        OSS_ACCESS_KEY_ID: dummy
+        OSS_ACCESS_KEY_SECRET: dummy
+        RDS_HOST: dummy
+        RDS_PORT: dummy
+        RDS_DATABASE: dummy
+        RDS_USER: dummy
+        RDS_PASSWORD: dummy
