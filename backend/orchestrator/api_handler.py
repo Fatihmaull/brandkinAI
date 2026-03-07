@@ -53,14 +53,14 @@ def get_project_status(project_id: str, headers: Dict, db: Any) -> Dict[str, Any
         'current_stage': project.get('current_stage'),
         'brand_brief': project.get('brand_brief'),
         'brand_dna': json.loads(project['brand_dna']) if project.get('brand_dna') and isinstance(project['brand_dna'], str) else project.get('brand_dna'),
-        'created_at': project.get('created_at').isoformat() if project.get('created_at') else None,
-        'updated_at': project.get('updated_at').isoformat() if project.get('updated_at') else None,
+        'created_at': project.get('created_at'),
+        'updated_at': project.get('updated_at'),
         'assets': asset_summary,
         'code_exports': len(code_exports),
         'brand_kit': {
             'available': brand_kit is not None,
             'download_url': brand_kit.get('signed_url') if brand_kit else None,
-            'expires_at': brand_kit.get('url_expires_at').isoformat() if brand_kit and brand_kit.get('url_expires_at') else None
+            'expires_at': brand_kit.get('url_expires_at')
         } if brand_kit else None
     }
     
@@ -86,7 +86,7 @@ def get_project_assets(project_id: str, headers: Dict, db: Any) -> Dict[str, Any
         'asset_id': a['asset_id'], 'type': a['asset_type'], 'stage': a['stage'],
         'oss_url': a.get('oss_url'), 'transparent_url': a.get('transparent_url'),
         'is_selected': a.get('is_selected', False), 'metadata': a.get('metadata'),
-        'created_at': a.get('created_at').isoformat() if a.get('created_at') else None
+        'created_at': a.get('created_at')
     } for a in assets]
     return {'statusCode': 200, 'headers': headers, 'body': json.dumps({'project_id': project_id, 'assets': formatted})}
 
@@ -99,7 +99,7 @@ def get_code_exports(project_id: str, headers: Dict, db: Any) -> Dict[str, Any]:
         'export_id': e['export_id'], 'component_name': e.get('component_name'),
         'react_code': e.get('react_code'), 'css_keyframes': e.get('css_keyframes'),
         'usage_snippet': e.get('usage_snippet'),
-        'created_at': e.get('created_at').isoformat() if e.get('created_at') else None
+        'created_at': e.get('created_at')
     } for e in exports]
     return {'statusCode': 200, 'headers': headers, 'body': json.dumps({'project_id': project_id, 'code_exports': formatted})}
 
