@@ -16,11 +16,12 @@ interface Asset {
 
 interface AssetGalleryProps {
   assets: Asset[];
+  status?: string;
   onSelect: (assetId: string, type: string) => void;
   onRevise: (assetId: string, feedback: string, type: string) => void;
 }
 
-export default function AssetGallery({ assets, onSelect, onRevise }: AssetGalleryProps) {
+export default function AssetGallery({ assets, status, onSelect, onRevise }: AssetGalleryProps) {
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
   const [revisionFeedback, setRevisionFeedback] = useState('');
   const [showRevisionModal, setShowRevisionModal] = useState(false);
