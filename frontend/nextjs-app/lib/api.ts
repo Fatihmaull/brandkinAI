@@ -62,11 +62,11 @@ export const api = {
 
   // Stage 3: Select character
   selectCharacter: (projectId: string, assetId: string, type: string) =>
-    apiRequest('POST', `/api/v1/projects/${projectId}/select`, { asset_id: assetId, type }),
+    apiRequest('POST', `/api/v1/projects/${projectId}/select`, { project_id: projectId, asset_id: assetId, type }),
 
   // Stage 6: Request revision
   requestRevision: (projectId: string, assetId: string, feedback: string, type: string) =>
-    apiRequest('POST', `/api/v1/projects/${projectId}/revise`, { asset_id: assetId, feedback, type }),
+    apiRequest('POST', `/api/v1/projects/${projectId}/revise`, { project_id: projectId, asset_id: assetId, feedback, type }),
 
   // Stage 7: Finalize brand kit
   finalizeProject: (projectId: string) =>
