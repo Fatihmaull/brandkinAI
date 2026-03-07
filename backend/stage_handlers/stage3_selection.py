@@ -114,33 +114,44 @@ def process_selection(project_id: str, asset_id: str, selection_type: str) -> Di
     }
 
 
+import threading
+import logging
+
+logger = logging.getLogger(__name__)
+
 def trigger_stage4(project_id: str, selected_asset: Dict, brand_dna: Dict):
     """
-    Trigger Stage 4: Pose Pack Generation.
-    
-    Args:
-        project_id: Project UUID
-        selected_asset: Selected mascot/avatar asset
-        brand_dna: Brand DNA for context
+    Trigger Stage 4: Pose Pack Generation in a background thread.
     """
-    from .stage4_poses import process_stage4
+    def _run_stage4():
+        try:
+            from .stage4_poses import process_stage4
+            process_stage4(project_id, selected_asset, brand_dna)
+        except Exception as e:
+            logger.error(f"Stage 4 background processing failed for {project_id}: {e}", exc_info=True)
+            try:
+                db.update_project_status(project_id, 'failed', stage=4, error=str(e))
+            except Exception:
+                pass
     
-    # Direct call for synchronous flow
-    # In production: send MNS message
-    process_stage4(project_id, selected_asset, brand_dna)
+    thread = threading.Thread(target=_run_stage4, daemon=True)
+    thread.start()
 
 
 def trigger_stage5(project_id: str, selected_asset: Dict, brand_dna: Dict):
     """
-    Trigger Stage 5: Code Export.
-    
-    Args:
-        project_id: Project UUID
-        selected_asset: Selected mascot/avatar asset
-        brand_dna: Brand DNA for context
+    Trigger Stage 5: Code Export in a background thread.
     """
-    from .stage5_code import process_stage5
+    def _run_stage5():
+        try:
+            from .stage5_code import process_stage5
+            process_stage5(project_id, selected_asset, brand_dna)
+        except Exception as e:
+            logger.error(f"Stage 5 background processing failed for {project_id}: {e}", exc_info=True)
+            try:
+                db.update_project_status(project_id, 'failed', stage=5, error=str(e))
+            except Exception:
+                pass
     
-    # Direct call for synchronous flow
-    # In production: send MNS message
-    process_stage5(project_id, selected_asset, brand_dna)
+    thread = threading.Thread(target=_run_stage5, daemon=True)
+    thread.start()
