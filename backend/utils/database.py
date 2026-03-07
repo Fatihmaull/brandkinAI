@@ -1,353 +1,301 @@
 """
-BrandKin AI - Database Models and Connection
-RDS MySQL Schema for projects, assets, and generations
+BrandKin AI - OSS Database Models
+Serverless JSON Document Store using Alibaba Cloud OSS for project state tracking.
 """
 
 import json
-import os
 import logging
-from typing import Dict, List, Optional, Any, Union
-from datetime import datetime
-from contextlib import contextmanager
+from typing import Dict, List, Optional
+from datetime import datetime, timezone
+from pathlib import Path
 
-import pymysql
-import threading
-
-from .credentials import get_rds_config
+# Important: we import the unified OSS/Local handler which transparently handles local dev vs FC
+from .oss_handler import oss_handler
 
 logger = logging.getLogger(__name__)
 
-
 class Database:
-    """RDS MySQL connection manager for BrandKin AI.
+    """OSS JSON Document manager for BrandKin AI.
     
-    Uses threading.local() so each thread gets its own connection.
-    This is critical for thread safety when background threads
-    (stage processing) run concurrently with request threads.
+    Replaces RDS MySQL with simple JSON files stored under the `db/` prefix in your OSS bucket.
+    This saves costs and runs entirely serverless.
     """
     
     def __init__(self):
-        self.config = get_rds_config()
-        self._local = threading.local()
+        # Database prefix in OSS bucket to separate database files from assets
+        self.prefix = "db"
     
-    def _get_thread_connection(self) -> pymysql.connections.Connection:
-        """Get or create a connection for the current thread."""
-        conn = getattr(self._local, 'connection', None)
-        if conn is None or not conn.open:
-            conn = pymysql.connect(
-                host=self.config['host'],
-                port=self.config['port'],
-                database=self.config['database'],
-                user=self.config['user'],
-                password=self.config['password'],
-                charset='utf8mb4',
-                cursorclass=pymysql.cursors.DictCursor,
-                connect_timeout=10,
-                read_timeout=30,
-                write_timeout=30
-            )
-            self._local.connection = conn
-        else:
-            conn.ping(reconnect=True)
-        return conn
+    def _now(self) -> str:
+        """Helper to get current ISO timestamp string."""
+        return datetime.now(timezone.utc).isoformat()
     
-    @contextmanager
-    def get_connection(self):
-        """Context manager for database connections.
-        
-        Each thread gets its own connection via threading.local().
-        """
-        conn = self._get_thread_connection()
+    def _get_doc(self, key: str) -> Optional[Dict]:
+        """Fetch and parse a JSON document from OSS."""
+        oss_key = f"{self.prefix}/{key}"
         try:
-            yield conn
-            conn.commit()
+            if oss_handler.object_exists(oss_key):
+                data_bytes = oss_handler.download_to_memory(oss_key)
+                return json.loads(data_bytes.decode('utf-8'))
+            return None
         except Exception as e:
-            if conn.open:
-                conn.rollback()
-            raise e
-    
+            logger.error(f"Error reading document {oss_key}: {e}")
+            return None
+
+    def _save_doc(self, key: str, data: Dict):
+        """Stringify and save a JSON document to OSS."""
+        oss_key = f"{self.prefix}/{key}"
+        json_bytes = json.dumps(data, default=str).encode('utf-8')
+        oss_handler.upload_data(json_bytes, oss_key)
+
     def init_schema(self):
-        """Initialize database schema. Run once during setup."""
-        schema = """
-        CREATE TABLE IF NOT EXISTS projects (
-            project_id VARCHAR(64) PRIMARY KEY,
-            brand_brief JSON NOT NULL,
-            status VARCHAR(32) DEFAULT 'initialized',
-            current_stage INT DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            completed_at TIMESTAMP NULL,
-            error_message TEXT,
-            INDEX idx_status (status),
-            INDEX idx_created (created_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-        
-        CREATE TABLE IF NOT EXISTS assets (
-            asset_id VARCHAR(64) PRIMARY KEY,
-            project_id VARCHAR(64) NOT NULL,
-            asset_type ENUM('mascot', 'avatar', 'pose', 'banner', 'logo', 'icon') NOT NULL,
-            stage INT NOT NULL,
-            oss_url VARCHAR(512),
-            transparent_url VARCHAR(512),
-            metadata JSON,
-            is_selected BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
-            INDEX idx_project (project_id),
-            INDEX idx_type (asset_type)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-        
-        CREATE TABLE IF NOT EXISTS generations (
-            generation_id VARCHAR(64) PRIMARY KEY,
-            project_id VARCHAR(64) NOT NULL,
-            stage INT NOT NULL,
-            status ENUM('pending', 'processing', 'completed', 'failed') DEFAULT 'pending',
-            retry_count INT DEFAULT 0,
-            input_params JSON,
-            output_result JSON,
-            error_message TEXT,
-            started_at TIMESTAMP NULL,
-            completed_at TIMESTAMP NULL,
-            FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
-            INDEX idx_project_stage (project_id, stage)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-        
-        CREATE TABLE IF NOT EXISTS code_exports (
-            export_id VARCHAR(64) PRIMARY KEY,
-            project_id VARCHAR(64) NOT NULL,
-            component_name VARCHAR(128),
-            react_code TEXT,
-            css_keyframes TEXT,
-            usage_snippet TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-        
-        CREATE TABLE IF NOT EXISTS brand_kits (
-            kit_id VARCHAR(64) PRIMARY KEY,
-            project_id VARCHAR(64) NOT NULL,
-            zip_url VARCHAR(512),
-            signed_url VARCHAR(512),
-            url_expires_at TIMESTAMP NULL,
-            download_count INT DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-        
-        CREATE TABLE IF NOT EXISTS brand_dna (
-            dna_id VARCHAR(64) PRIMARY KEY,
-            project_id VARCHAR(64) NOT NULL,
-            brand_name VARCHAR(256),
-            brand_personality JSON,
-            target_audience JSON,
-            visual_style JSON,
-            mascot_concept JSON,
-            avatar_concept JSON,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
-            INDEX idx_project (project_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-        """
-        
-        with self.get_connection() as conn:
-            with conn.cursor() as cursor:
-                for statement in schema.split(';'):
-                    stmt = statement.strip()
-                    if stmt:
-                        cursor.execute(stmt)
-        logger.info("Database schema initialized")
-    
+        """No-op for OSS Database. Schemas are implicit JSON structures."""
+        logger.info("OSS JSON Database initialized. No rigid schema required.")
+        pass
+
     # Project operations
     def create_project(self, project_id: str, brand_brief: Dict) -> bool:
-        """Create a new project."""
-        with self.get_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    "INSERT INTO projects (project_id, brand_brief, status) VALUES (%s, %s, %s)",
-                    (project_id, json.dumps(brand_brief), 'initialized')
-                )
-                return cursor.rowcount > 0
-    
+        """Create a new project document."""
+        doc = {
+            "project_id": project_id,
+            "brand_brief": brand_brief,
+            "status": "initialized",
+            "current_stage": 0,
+            "created_at": self._now(),
+            "updated_at": self._now(),
+            "completed_at": None,
+            "error_message": None
+        }
+        self._save_doc(f"projects/{project_id}/state.json", doc)
+        return True
+
     def get_project(self, project_id: str) -> Optional[Dict]:
-        """Get project by ID."""
-        with self.get_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    "SELECT * FROM projects WHERE project_id = %s",
-                    (project_id,)
-                )
-                result = cursor.fetchone()
-                if result and result.get('brand_brief'):
-                    if isinstance(result['brand_brief'], str):
-                        result['brand_brief'] = json.loads(result['brand_brief'])
-                return result
-    
+        """Get project state by ID."""
+        return self._get_doc(f"projects/{project_id}/state.json")
+
     def update_project_status(self, project_id: str, status: str, stage: Optional[int] = None, error: Optional[str] = None):
-        """Update project status and stage."""
-        with self.get_connection() as conn:
-            with conn.cursor() as cursor:
-                if stage is not None and error:
-                    cursor.execute(
-                        "UPDATE projects SET status = %s, current_stage = %s, error_message = %s WHERE project_id = %s",
-                        (status, stage, error, project_id)
-                    )
-                elif stage is not None:
-                    cursor.execute(
-                        "UPDATE projects SET status = %s, current_stage = %s WHERE project_id = %s",
-                        (status, stage, project_id)
-                    )
-                elif error:
-                    cursor.execute(
-                        "UPDATE projects SET status = %s, error_message = %s WHERE project_id = %s",
-                        (status, error, project_id)
-                    )
-                else:
-                    cursor.execute(
-                        "UPDATE projects SET status = %s WHERE project_id = %s",
-                        (status, project_id)
-                    )
-    
+        """Update project status and stage in its state file."""
+        doc = self.get_project(project_id)
+        if not doc:
+            return
+        
+        doc["status"] = status
+        doc["updated_at"] = self._now()
+        
+        if stage is not None:
+            doc["current_stage"] = stage
+        if error:
+            doc["error_message"] = error
+            
+        if status == 'completed' and stage == 7:
+            # Special logic for final assembly completion
+            doc["completed_at"] = self._now()
+            
+        self._save_doc(f"projects/{project_id}/state.json", doc)
+
     # Asset operations
     def create_asset(self, asset_id: str, project_id: str, asset_type: str, stage: int, metadata: Optional[Dict] = None):
-        """Create a new asset record."""
-        with self.get_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """INSERT INTO assets (asset_id, project_id, asset_type, stage, metadata) 
-                       VALUES (%s, %s, %s, %s, %s)""",
-                    (asset_id, project_id, asset_type, stage, json.dumps(metadata) if metadata else None)
-                )
-    
+        """Create a new asset record within the project's assets list."""
+        assets_key = f"projects/{project_id}/assets.json"
+        assets_doc = self._get_doc(assets_key) or {"items": []}
+        
+        new_asset = {
+            "asset_id": asset_id,
+            "project_id": project_id,
+            "asset_type": asset_type,
+            "stage": stage,
+            "oss_url": None,
+            "transparent_url": None,
+            "metadata": metadata,
+            "is_selected": False,
+            "created_at": self._now()
+        }
+        assets_doc["items"].append(new_asset)
+        self._save_doc(assets_key, assets_doc)
+        
+        # Save index for fast lookups without scanning
+        self._save_doc(f"index/assets/{asset_id}.json", {"project_id": project_id})
+
     def update_asset_urls(self, asset_id: str, oss_url: Optional[str] = None, transparent_url: Optional[str] = None):
-        """Update asset URLs after generation."""
-        with self.get_connection() as conn:
-            with conn.cursor() as cursor:
-                if oss_url and transparent_url:
-                    cursor.execute(
-                        "UPDATE assets SET oss_url = %s, transparent_url = %s WHERE asset_id = %s",
-                        (oss_url, transparent_url, asset_id)
-                    )
-                elif oss_url:
-                    cursor.execute(
-                        "UPDATE assets SET oss_url = %s WHERE asset_id = %s",
-                        (oss_url, asset_id)
-                    )
-                elif transparent_url:
-                    cursor.execute(
-                        "UPDATE assets SET transparent_url = %s WHERE asset_id = %s",
-                        (transparent_url, asset_id)
-                    )
-    
+        """Update URLs utilizing the asset index."""
+        index_key = f"index/assets/{asset_id}.json"
+        index = self._get_doc(index_key)
+        
+        if not index:
+            # Fallback scan utilizing pathlib to handle cross-platform slashes
+            all_project_dirs = oss_handler.list_objects(prefix=f"{self.prefix}/projects/")
+            for p in all_project_dirs:
+                # Replace Windows slashes for consistent splitting
+                p_norm = str(p).replace('\\', '/')
+                parts = p_norm.split('/')
+                if len(parts) > 2:
+                    pid = parts[2]
+                    assets_doc = self._get_doc(f"projects/{pid}/assets.json")
+                    if assets_doc:
+                        for asset in assets_doc.get("items", []):
+                            if asset["asset_id"] == asset_id:
+                                self._update_asset_in_project(pid, asset_id, oss_url, transparent_url)
+                                return
+        else:
+            self._update_asset_in_project(index["project_id"], asset_id, oss_url, transparent_url)
+
+    def _update_asset_in_project(self, project_id: str, asset_id: str, oss_url: Optional[str], transparent_url: Optional[str]):
+        assets_key = f"projects/{project_id}/assets.json"
+        assets_doc = self._get_doc(assets_key)
+        if assets_doc:
+            for asset in assets_doc.get("items", []):
+                if asset["asset_id"] == asset_id:
+                    if oss_url:
+                        asset["oss_url"] = oss_url
+                    if transparent_url:
+                        asset["transparent_url"] = transparent_url
+            self._save_doc(assets_key, assets_doc)
+
     def select_asset(self, asset_id: str):
-        """Mark asset as selected by user."""
-        with self.get_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    "UPDATE assets SET is_selected = TRUE WHERE asset_id = %s",
-                    (asset_id,)
-                )
-    
+        """Mark asset as selected."""
+        all_project_dirs = oss_handler.list_objects(prefix=f"{self.prefix}/projects/")
+        for p in all_project_dirs:
+            p_norm = str(p).replace('\\', '/')
+            parts = p_norm.split('/')
+            if len(parts) > 2:
+                pid = parts[2]
+                assets_key = f"projects/{pid}/assets.json"
+                assets_doc = self._get_doc(assets_key)
+                if assets_doc:
+                    for asset in assets_doc.get("items", []):
+                        if asset["asset_id"] == asset_id:
+                            asset["is_selected"] = True
+                            self._save_doc(assets_key, assets_doc)
+                            return
+
     def get_project_assets(self, project_id: str, asset_type: Optional[str] = None) -> List[Dict]:
         """Get all assets for a project."""
-        with self.get_connection() as conn:
-            with conn.cursor() as cursor:
-                if asset_type:
-                    cursor.execute(
-                        "SELECT * FROM assets WHERE project_id = %s AND asset_type = %s ORDER BY created_at",
-                        (project_id, asset_type)
-                    )
-                else:
-                    cursor.execute(
-                        "SELECT * FROM assets WHERE project_id = %s ORDER BY created_at",
-                        (project_id,)
-                    )
-                results = cursor.fetchall()
-                for r in results:
-                    if r.get('metadata') and isinstance(r['metadata'], str):
-                        r['metadata'] = json.loads(r['metadata'])
-                return results
-    
-    # Generation tracking
+        assets_doc = self._get_doc(f"projects/{project_id}/assets.json")
+        if not assets_doc:
+            return []
+        
+        items = assets_doc.get("items", [])
+        if asset_type:
+            items = [item for item in items if item.get("asset_type") == asset_type]
+            
+        items.sort(key=lambda x: x.get("created_at", ""))
+        return items
+
     def create_generation(self, generation_id: str, project_id: str, stage: int, input_params: Dict):
         """Create a generation tracking record."""
-        with self.get_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """INSERT INTO generations (generation_id, project_id, stage, status, input_params, started_at) 
-                       VALUES (%s, %s, %s, %s, %s, NOW())""",
-                    (generation_id, project_id, stage, 'processing', json.dumps(input_params))
-                )
-    
+        gens_key = f"projects/{project_id}/generations.json"
+        gens_doc = self._get_doc(gens_key) or {"items": []}
+        
+        new_gen = {
+            "generation_id": generation_id,
+            "project_id": project_id,
+            "stage": stage,
+            "status": "processing",
+            "retry_count": 0,
+            "input_params": input_params,
+            "output_result": None,
+            "error_message": None,
+            "started_at": self._now(),
+            "completed_at": None
+        }
+        gens_doc["items"].append(new_gen)
+        self._save_doc(gens_key, gens_doc)
+        
+        self._save_doc(f"index/generations/{generation_id}.json", {"project_id": project_id})
+
     def complete_generation(self, generation_id: str, output_result: Optional[Dict] = None, error: Optional[str] = None):
         """Mark generation as completed or failed."""
-        with self.get_connection() as conn:
-            with conn.cursor() as cursor:
-                if error:
-                    cursor.execute(
-                        """UPDATE generations 
-                           SET status = 'failed', error_message = %s, completed_at = NOW() 
-                           WHERE generation_id = %s""",
-                        (error, generation_id)
-                    )
-                else:
-                    cursor.execute(
-                        """UPDATE generations 
-                           SET status = 'completed', output_result = %s, completed_at = NOW() 
-                           WHERE generation_id = %s""",
-                        (json.dumps(output_result) if output_result else None, generation_id)
-                    )
-    
+        index = self._get_doc(f"index/generations/{generation_id}.json")
+        if not index:
+            all_project_dirs = oss_handler.list_objects(prefix=f"{self.prefix}/projects/")
+            project_ids = []
+            for p in all_project_dirs:
+                p_norm = str(p).replace('\\', '/')
+                parts = p_norm.split('/')
+                if len(parts) > 2:
+                    project_ids.append(parts[2])
+            project_ids = list(set(project_ids))
+        else:
+            project_ids = [index["project_id"]]
+            
+        for pid in project_ids:
+            gens_key = f"projects/{pid}/generations.json"
+            gens_doc = self._get_doc(gens_key)
+            if gens_doc:
+                for gen in gens_doc.get("items", []):
+                    if gen["generation_id"] == generation_id:
+                        gen["completed_at"] = self._now()
+                        if error:
+                            gen["status"] = "failed"
+                            gen["error_message"] = error
+                        else:
+                            gen["status"] = "completed"
+                            if output_result is not None:
+                                gen["output_result"] = output_result
+                        self._save_doc(gens_key, gens_doc)
+                        return
+
     # Code export operations
     def save_code_export(self, export_id: str, project_id: str, component_data: Dict):
         """Save generated React component."""
-        with self.get_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """INSERT INTO code_exports 
-                       (export_id, project_id, component_name, react_code, css_keyframes, usage_snippet) 
-                       VALUES (%s, %s, %s, %s, %s, %s)""",
-                    (
-                        export_id, project_id,
-                        component_data.get('component_name'),
-                        component_data.get('react_code'),
-                        component_data.get('css_keyframes'),
-                        component_data.get('usage_snippet')
-                    )
-                )
-    
+        exports_key = f"projects/{project_id}/code_exports.json"
+        exports_doc = self._get_doc(exports_key) or {"items": []}
+        
+        new_export = {
+            "export_id": export_id,
+            "project_id": project_id,
+            "component_name": component_data.get('component_name'),
+            "react_code": component_data.get('react_code'),
+            "css_keyframes": component_data.get('css_keyframes'),
+            "usage_snippet": component_data.get('usage_snippet'),
+            "created_at": self._now()
+        }
+        exports_doc["items"].append(new_export)
+        self._save_doc(exports_key, exports_doc)
+
     def get_code_exports(self, project_id: str) -> List[Dict]:
         """Get all code exports for a project."""
-        with self.get_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    "SELECT * FROM code_exports WHERE project_id = %s ORDER BY created_at",
-                    (project_id,)
-                )
-                return cursor.fetchall()
-    
+        exports_doc = self._get_doc(f"projects/{project_id}/code_exports.json")
+        if not exports_doc:
+            return []
+        items = exports_doc.get("items", [])
+        items.sort(key=lambda x: x.get("created_at", ""))
+        return items
+
     # Brand kit operations
     def save_brand_kit(self, kit_id: str, project_id: str, zip_url: str, signed_url: str, expires_at: datetime):
         """Save brand kit assembly info."""
-        with self.get_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """INSERT INTO brand_kits 
-                       (kit_id, project_id, zip_url, signed_url, url_expires_at) 
-                       VALUES (%s, %s, %s, %s, %s)""",
-                    (kit_id, project_id, zip_url, signed_url, expires_at)
-                )
-    
-    def get_brand_kit(self, project_id: str) -> Optional[Dict]:
-        """Get brand kit for a project."""
-        with self.get_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    "SELECT * FROM brand_kits WHERE project_id = %s ORDER BY created_at DESC LIMIT 1",
-                    (project_id,)
-                )
-                return cursor.fetchone()
+        doc = {
+            "kit_id": kit_id,
+            "project_id": project_id,
+            "zip_url": zip_url,
+            "signed_url": signed_url,
+            "url_expires_at": expires_at.isoformat() if expires_at else None,
+            "download_count": 0,
+            "created_at": self._now()
+        }
+        self._save_doc(f"projects/{project_id}/brand_kit_{kit_id}.json", doc)
 
+    def get_brand_kit(self, project_id: str) -> Optional[Dict]:
+        """Get the latest brand kit for a project."""
+        # Find all brand kits for this project
+        kit_files = oss_handler.list_objects(prefix=f"{self.prefix}/projects/{project_id}/brand_kit_")
+        if not kit_files:
+            return None
+            
+        # Get latest by sorting string names (since created_at makes them monotonically increasing, or we just read all and sort)
+        kits = []
+        for file_key in kit_files:
+            # Strip db/ prefix
+            key = file_key[len(self.prefix)+1:]
+            doc = self._get_doc(key)
+            if doc:
+                kits.append(doc)
+                
+        if not kits:
+            return None
+            
+        kits.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        return kits[0]
 
 # Singleton instance
 db = Database()

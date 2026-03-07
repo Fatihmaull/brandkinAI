@@ -68,20 +68,7 @@ def get_oss_config() -> Dict[str, str]:
     }
 
 
-def get_rds_config() -> Dict[str, str]:
-    """
-    Get RDS MySQL configuration from environment variables.
-    
-    Returns:
-        Dict containing host, port, database, user, password
-    """
-    return {
-        'host': os.environ.get('RDS_HOST', 'brandkin-ai.mysql.rds.aliyuncs.com'),
-        'port': int(os.environ.get('RDS_PORT', '3306')),
-        'database': os.environ.get('RDS_DATABASE', 'brandkin_ai'),
-        'user': os.environ.get('RDS_USER', 'brandkin_admin'),
-        'password': os.environ.get('RDS_PASSWORD', '')
-    }
+
 
 
 def get_mns_config() -> Dict[str, str]:
