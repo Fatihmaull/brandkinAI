@@ -7,6 +7,7 @@ oss2>=2.18.0
 
 # HTTP Client
 requests==2.31.0
+urllib3<2
 
 # Utilities
 python-json-logger>=2.0.0
