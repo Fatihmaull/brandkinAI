@@ -298,8 +298,27 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* Error State */}
+              {projectStatus === 'failed' && (
+                <div className="studio-card p-8 border-red-500/30 bg-red-500/5 text-center">
+                  <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+                    <span className="text-red-400 text-2xl">⚠️</span>
+                  </div>
+                  <h2 className="text-xl font-semibold mb-2 text-red-200">Generation Failed</h2>
+                  <p className="text-sm text-red-300/80 mb-6">
+                    A critical error occurred during the backend generation process. Please check your Alibaba Cloud Model Studio API billings or endpoints.
+                  </p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="studio-btn px-6 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 border-red-500/30"
+                  >
+                    Start Over
+                  </button>
+                </div>
+              )}
+
               {/* Loading State & Progress (shown above contents) */}
-              {(isLoading || projectStatus === 'processing') && (
+              {(isLoading || projectStatus === 'processing') && projectStatus !== 'failed' && (
                 <GenerationProgress currentStage={currentStage} status={projectStatus} />
               )}
 
