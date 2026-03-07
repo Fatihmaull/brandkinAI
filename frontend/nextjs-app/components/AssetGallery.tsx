@@ -148,18 +148,18 @@ export default function AssetGallery({ assets, status, onSelect, onRevise }: Ass
             </div>
 
             {/* Generation Status Indicator */}
-            {status === 'awaiting_finalization' && poses.length < 4 && (
+            {status === 'awaiting_finalization' && poses.length < 5 && (
               <div className="flex items-center gap-3 px-4 py-2 bg-[#0d0d0d] rounded-full border border-[#2c2c2e]">
                 <div className="w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
                 <span className="text-sm text-gray-400">
-                  <span className="text-white font-medium">{poses.length}</span> out of <span className="text-white font-medium">4</span> poses generated. Please wait...
+                  <span className="text-white font-medium">{poses.length}</span> out of <span className="text-white font-medium">5</span> poses generated. Please wait...
                 </span>
               </div>
             )}
-            {status === 'awaiting_finalization' && poses.length >= 4 && (
+            {status === 'awaiting_finalization' && poses.length >= 5 && (
               <div className="flex items-center gap-2 px-4 py-2 bg-green-500/10 rounded-full border border-green-500/30">
                 <Check className="w-4 h-4 text-green-400" />
-                <span className="text-sm text-green-400 font-medium">All 4 poses generated!</span>
+                <span className="text-sm text-green-400 font-medium">All 5 poses generated!</span>
               </div>
             )}
           </div>
