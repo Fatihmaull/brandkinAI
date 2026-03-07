@@ -341,6 +341,7 @@ export default function Home() {
                   </h2>
                   <AssetGallery
                     assets={assets}
+                    status={projectStatus}
                     onSelect={handleCharacterSelect}
                     onRevise={handleRevision}
                   />

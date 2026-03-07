@@ -77,8 +77,8 @@ export default function AssetGallery({ assets, onSelect, onRevise }: AssetGaller
           <button
             onClick={() => handleSelect(asset)}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${asset.is_selected
-                ? 'bg-blue-500 text-white'
-                : 'bg-[#1c1c1e] hover:bg-[#2c2c2e] text-gray-300'
+              ? 'bg-blue-500 text-white'
+              : 'bg-[#1c1c1e] hover:bg-[#2c2c2e] text-gray-300'
               }`}
           >
             {asset.is_selected ? 'Selected' : 'Select'}
@@ -136,17 +136,43 @@ export default function AssetGallery({ assets, onSelect, onRevise }: AssetGaller
       )}
 
       {/* Poses */}
-      {poses.length > 0 && (
+      {(poses.length > 0 || status === 'awaiting_finalization') && (
         <div className="studio-card p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
-              <Move className="w-4 h-4 text-green-400" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
+                <Move className="w-4 h-4 text-green-400" />
+              </div>
+              <h3 className="text-lg font-medium text-white">Pose Pack</h3>
             </div>
-            <h3 className="text-lg font-medium text-white">Pose Pack</h3>
+
+            {/* Generation Status Indicator */}
+            {status === 'awaiting_finalization' && poses.length < 4 && (
+              <div className="flex items-center gap-3 px-4 py-2 bg-[#0d0d0d] rounded-full border border-[#2c2c2e]">
+                <div className="w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+                <span className="text-sm text-gray-400">
+                  <span className="text-white font-medium">{poses.length}</span> out of <span className="text-white font-medium">4</span> poses generated. Please wait...
+                </span>
+              </div>
+            )}
+            {status === 'awaiting_finalization' && poses.length >= 4 && (
+              <div className="flex items-center gap-2 px-4 py-2 bg-green-500/10 rounded-full border border-green-500/30">
+                <Check className="w-4 h-4 text-green-400" />
+                <span className="text-sm text-green-400 font-medium">All 4 poses generated!</span>
+              </div>
+            )}
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-            {poses.map(asset => renderAssetCard(asset, false))}
-          </div>
+
+          {poses.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+              {poses.map(asset => renderAssetCard(asset, false))}
+            </div>
+          ) : (
+            <div className="py-12 flex flex-col items-center justify-center border border-dashed border-[#2c2c2e] rounded-xl bg-black/20">
+              <div className="w-10 h-10 rounded-full border-4 border-[#2c2c2e] border-t-blue-500 animate-spin mb-4" />
+              <p className="text-gray-400">Generating your brand's custom poses...</p>
+            </div>
+          )}
         </div>
       )}
 
