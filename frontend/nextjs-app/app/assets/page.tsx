@@ -104,7 +104,7 @@ function AssetsContent() {
       <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-400 mb-4">No project selected</p>
-          <Link href="/" className="studio-btn inline-block">
+          <Link href="/demo" className="studio-btn inline-block">
             Go Home
           </Link>
         </div>
@@ -163,7 +163,7 @@ function AssetsContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link href="/" className="text-gray-400 hover:text-white transition-colors">
+              <Link href="/demo" className="text-gray-400 hover:text-white transition-colors">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
               <div>
@@ -200,7 +200,7 @@ function AssetsContent() {
             <p className="text-gray-400 text-center max-w-md mb-6">
               Your generated assets will appear here. Continue with your project to create mascots, avatars, and poses.
             </p>
-            <Link href={`/?project=${projectId}`} className="studio-btn">
+            <Link href={`/demo?id=${projectId}`} className="studio-btn">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Continue Project
             </Link>

@@ -36,7 +36,7 @@ function LoadingState() {
 function ComponentsContent() {
   const searchParams = useSearchParams();
   const projectId = searchParams.get('id');
-  
+
   const [project, setProject] = useState<Project | null>(null);
   const [exports, setExports] = useState<CodeExport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -58,7 +58,7 @@ function ComponentsContent() {
         api.getProject(id),
         api.getCodeExports(id)
       ]);
-      
+
       if (projectRes.data) {
         setProject(projectRes.data as Project);
       }
@@ -88,7 +88,7 @@ function ComponentsContent() {
 
   const getActiveContent = () => {
     if (!selectedExport) return '';
-    
+
     switch (activeTab) {
       case 'code':
         return selectedExport.react_code;
@@ -125,7 +125,7 @@ function ComponentsContent() {
       <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-400 mb-4">No project selected</p>
-          <Link href="/" className="studio-btn inline-block">
+          <Link href="/demo" className="studio-btn inline-block">
             Go Home
           </Link>
         </div>
@@ -140,7 +140,7 @@ function ComponentsContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link href="/" className="text-gray-400 hover:text-white transition-colors">
+              <Link href="/demo" className="text-gray-400 hover:text-white transition-colors">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
               <div>
@@ -149,13 +149,13 @@ function ComponentsContent() {
               </div>
             </div>
             <div className="flex gap-3">
-              <Link 
+              <Link
                 href={`/brand?id=${projectId}`}
                 className="studio-btn-secondary text-sm"
               >
                 View Brand
               </Link>
-              <Link 
+              <Link
                 href={`/assets?id=${projectId}`}
                 className="studio-btn-secondary text-sm"
               >
@@ -211,11 +211,10 @@ function ComponentsContent() {
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                    activeTab === tab 
-                      ? 'bg-[#3c3c43] text-white' 
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === tab
+                      ? 'bg-[#3c3c43] text-white'
                       : 'text-gray-400 hover:text-gray-200'
-                  }`}
+                    }`}
                 >
                   {getTabIcon(tab)}
                   {tab === 'code' ? 'React Code' : tab === 'css' ? 'CSS Keyframes' : 'Usage'}
@@ -228,7 +227,7 @@ function ComponentsContent() {
               <pre className="bg-[#0d0d0d] rounded-lg p-4 overflow-x-auto text-sm font-mono text-gray-300 max-h-96 overflow-y-auto border border-[#3c3c43]">
                 <code>{getActiveContent()}</code>
               </pre>
-              
+
               {/* Copy Button */}
               <button
                 onClick={() => handleCopy(getActiveContent())}

@@ -89,7 +89,7 @@ function BrandContent() {
       <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-400 mb-4">No project selected</p>
-          <Link href="/" className="studio-btn inline-block">
+          <Link href="/demo" className="studio-btn inline-block">
             Go Home
           </Link>
         </div>
@@ -105,7 +105,7 @@ function BrandContent() {
       <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-400 mb-4">Brand data not yet available. The AI is still processing.</p>
-          <Link href="/" className="studio-btn inline-block">
+          <Link href="/demo" className="studio-btn inline-block">
             Go Home
           </Link>
         </div>
@@ -120,7 +120,7 @@ function BrandContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link href="/" className="text-gray-400 hover:text-white transition-colors">
+              <Link href="/demo" className="text-gray-400 hover:text-white transition-colors">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
               <h1 className="text-xl font-semibold">Brand Details</h1>
